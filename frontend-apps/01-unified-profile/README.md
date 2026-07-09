@@ -31,3 +31,20 @@ npm run dev
 ```bash
 npm run build
 ```
+
+## Live Salesforce Account Panel
+
+This app now includes a `Live Salesforce Proxy Test` section in `src/routes/index.tsx`.
+It reads the Vercel environment variable `VITE_BACKEND_PROXY_URL` and calls:
+
+```text
+POST {VITE_BACKEND_PROXY_URL}/api/salesforce/soql
+```
+
+with this safe SOQL query:
+
+```sql
+SELECT Id, Name FROM Account LIMIT 5
+```
+
+The browser never receives Salesforce credentials. The request goes to the Railway backend proxy, and the proxy authenticates with Salesforce using Railway-only environment variables.

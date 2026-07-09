@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Mail,
   Phone,
@@ -15,6 +15,10 @@ import {
   Sparkles,
   ArrowUpRight,
   Database,
+  RefreshCw,
+  Server,
+  CheckCircle2,
+  AlertTriangle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -34,6 +38,50 @@ export const Route = createFileRoute("/")({
 // ============================================================================
 // MOCK DATA — Replace with Salesforce Data Cloud API response
 // ============================================================================
+
+// ============================================================================
+// LIVE SALESFORCE ACCOUNT TYPES
+// ============================================================================
+type SalesforceAccountRecord = {
+  Id: string;
+  Name: string;
+};
+
+type LiveAccountsState = {
+  loading: boolean;
+  error: string | null;
+  records: SalesforceAccountRecord[];
+  lastUpdated: string | null;
+};
+
+const BACKEND_PROXY_URL = import.meta.env.VITE_BACKEND_PROXY_URL as
+  | string
+  | undefined;
+
+async function fetchLiveSalesforceAccounts(): Promise<SalesforceAccountRecord[]> {
+  if (!BACKEND_PROXY_URL) {
+    throw new Error(
+      "Missing VITE_BACKEND_PROXY_URL. Add the Railway backend URL in Vercel Environment Variables.",
+    );
+  }
+
+  const response = await fetch(`${BACKEND_PROXY_URL}/api/salesforce/soql`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      query: "SELECT Id, Name FROM Account LIMIT 5",
+    }),
+  });
+
+  const payload = await response.json();
+
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error || `Request failed with status ${response.status}`);
+  }
+
+  return Array.isArray(payload.records) ? payload.records : [];
+}
+
 const MOCK_PROFILE_DATA = {
   profile: {
     id: "0018c00002abcXYZ",
@@ -146,9 +194,39 @@ const MOCK_PROFILE_DATA = {
 };
 
 function Index() {
-  // Wired to state so swapping in a live fetch is a single setter call.
+  // The original Lovable visual demo remains mock-driven.
+  // This live panel proves the browser can call Railway, and Railway can query Salesforce.
   const [data] = useState(MOCK_PROFILE_DATA);
+  const [liveAccounts, setLiveAccounts] = useState<LiveAccountsState>({
+    loading: false,
+    error: null,
+    records: [],
+    lastUpdated: null,
+  });
   const { profile, metrics, activities } = data;
+
+  const loadLiveAccounts = async () => {
+    setLiveAccounts((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const records = await fetchLiveSalesforceAccounts();
+      setLiveAccounts({
+        loading: false,
+        error: null,
+        records,
+        lastUpdated: new Date().toLocaleString(),
+      });
+    } catch (error) {
+      setLiveAccounts((current) => ({
+        ...current,
+        loading: false,
+        error: error instanceof Error ? error.message : "Unknown live Salesforce error",
+      }));
+    }
+  };
+
+  useEffect(() => {
+    loadLiveAccounts();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#07070d] text-slate-100 antialiased">
@@ -297,6 +375,86 @@ function Index() {
               </div>
             );
           })}
+        </section>
+
+        {/* Live Salesforce Proof Panel */}
+        <section className="mb-8 overflow-hidden rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.04] backdrop-blur-xl">
+          <div className="flex flex-col gap-4 border-b border-emerald-400/10 px-6 py-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-500/10 ring-1 ring-emerald-400/25">
+                <Server className="h-5 w-5 text-emerald-300" />
+              </div>
+              <div>
+                <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-emerald-200 uppercase ring-1 ring-emerald-400/20">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Live Salesforce Proxy Test
+                </div>
+                <h3 className="text-base font-semibold text-white">
+                  Live Account Records from Salesforce
+                </h3>
+                <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-400">
+                  This panel calls the Railway backend proxy, which authenticates
+                  with Salesforce using server-side credentials and runs a safe
+                  SOQL query. No Salesforce secrets are stored in the React app.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={loadLiveAccounts}
+              disabled={liveAccounts.loading}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-xs font-medium text-emerald-100 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${liveAccounts.loading ? "animate-spin" : ""}`}
+              />
+              {liveAccounts.loading ? "Refreshing..." : "Refresh Live Data"}
+            </button>
+          </div>
+
+          <div className="px-6 py-5">
+            {liveAccounts.error ? (
+              <div className="flex items-start gap-3 rounded-xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-medium">Live Salesforce request did not complete.</p>
+                  <p className="mt-1 text-xs text-amber-100/80">{liveAccounts.error}</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-3 md:grid-cols-5">
+                  {liveAccounts.records.map((account) => (
+                    <div
+                      key={account.Id}
+                      className="rounded-xl border border-white/10 bg-white/[0.04] p-4 transition-colors hover:bg-white/[0.07]"
+                    >
+                      <p className="text-sm font-medium leading-snug text-white">
+                        {account.Name}
+                      </p>
+                      <p className="mt-2 font-mono text-[10px] text-slate-500">
+                        {account.Id}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {!liveAccounts.loading && liveAccounts.records.length === 0 && (
+                  <p className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-400">
+                    No Account records returned yet. Confirm live mode is enabled
+                    in Railway and that the SOQL test works from Cmder.
+                  </p>
+                )}
+
+                <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                  <span>SOQL: SELECT Id, Name FROM Account LIMIT 5</span>
+                  {liveAccounts.lastUpdated && (
+                    <span>Last updated: {liveAccounts.lastUpdated}</span>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </section>
 
         {/* Activity Timeline */}
