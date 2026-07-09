@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Salesforce Agentforce React Portfolio</title>
+  <style>
+    :root {
+      --bg: #08111f;
+      --panel: rgba(255,255,255,.08);
+      --border: rgba(255,255,255,.16);
+      --text: #e8f2ff;
+      --muted: #a9bdd4;
+      --accent: #8b5cf6;
+      --accent2: #06b6d4;
+      --good: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(139,92,246,.28), transparent 35%),
+        radial-gradient(circle at 82% 18%, rgba(6,182,212,.24), transparent 30%),
+        linear-gradient(135deg, #050816, #0b1830 55%, #111827);
+      color: var(--text);
+      padding: 48px 24px;
+    }
+    main { max-width: 1100px; margin: 0 auto; }
+    .eyebrow { color: var(--accent2); text-transform: uppercase; letter-spacing: .16em; font-size: .78rem; font-weight: 800; }
+    h1 { font-size: clamp(2.2rem, 5vw, 4.3rem); margin: 12px 0 16px; line-height: 1.02; }
+    .intro { max-width: 780px; color: var(--muted); font-size: 1.08rem; line-height: 1.7; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 34px; }
+    .card {
+      display: flex;
+      flex-direction: column;
+      min-height: 270px;
+      padding: 24px;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 24px 80px rgba(0,0,0,.35);
+      text-decoration: none;
+      color: inherit;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+    .card:hover { transform: translateY(-4px); border-color: rgba(6,182,212,.55); background: rgba(255,255,255,.115); }
+    .level { color: var(--good); font-size: .82rem; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
+    h2 { margin: 10px 0; font-size: 1.35rem; }
+    p { color: var(--muted); line-height: 1.55; }
+    .pillrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 18px; }
+    .pill { border: 1px solid var(--border); border-radius: 999px; padding: 6px 10px; color: #dceaff; font-size: .78rem; background: rgba(255,255,255,.07); }
+    .note { margin-top: 28px; padding: 18px 20px; border: 1px solid rgba(251,191,36,.32); border-radius: 18px; color: #fef3c7; background: rgba(251,191,36,.08); }
+    footer { margin-top: 42px; color: var(--muted); font-size: .92rem; }
+    @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">React · Tailwind · Salesforce · Agentforce · Data Cloud</div>
+    <h1>Salesforce Agentforce Portfolio Suite</h1>
+    <p class="intro">
+      A three-app portfolio concept showing a practical progression from polished React dashboards, to AI chat state handling,
+      to GraphQL-style analytics visualization. The apps are intentionally mocked first, then wired through a Railway backend proxy when ready.
+    </p>
+
+    <section class="grid" aria-label="Portfolio applications">
+      <a class="card" href="https://REPLACE-WITH-UNIFIED-PROFILE-VERCEL-URL" target="_blank" rel="noreferrer">
+        <span class="level">App 01 · Easy</span>
+        <h2>Unified Profile Viewer</h2>
+        <p>Premium Data Cloud-style customer profile dashboard with metrics, timeline activity, and mock Salesforce state ready to replace later.</p>
+        <div class="pillrow"><span class="pill">React state</span><span class="pill">Tailwind</span><span class="pill">Data Cloud concept</span></div>
+      </a>
+
+      <a class="card" href="https://REPLACE-WITH-AGENTFORCE-CHAT-VERCEL-URL" target="_blank" rel="noreferrer">
+        <span class="level">App 02 · Medium</span>
+        <h2>Agentforce Guardrail Chat</h2>
+        <p>Interactive AI assistant interface with chat bubbles, simulated response timing, guardrail status, and expandable grounding data sources.</p>
+        <div class="pillrow"><span class="pill">Chat UI</span><span class="pill">Async mock state</span><span class="pill">Grounding UX</span></div>
+      </a>
+
+      <a class="card" href="https://REPLACE-WITH-COMMERCE-ANALYTICS-VERCEL-URL" target="_blank" rel="noreferrer">
+        <span class="level">App 03 · Complex</span>
+        <h2>Commerce Analytics Command Center</h2>
+        <p>Cyber-enterprise dashboard showing GraphQL-style query visualization, JSON response panels, KPIs, and filterable record grids.</p>
+        <div class="pillrow"><span class="pill">GraphQL concept</span><span class="pill">Dashboard UX</span><span class="pill">Filtered grids</span></div>
+      </a>
+    </section>
+
+    <div class="note">
+      Replace the three placeholder links after Vercel gives you the production URLs for each app.
+    </div>
+
+    <footer>
+      Backend proxy target: <code>https://REPLACE-WITH-RAILWAY-BACKEND-URL.up.railway.app</code>
+    </footer>
+  </main>
+</body>
+</html>

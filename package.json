@@ -1,0 +1,24 @@
+{
+  "name": "salesforce-agentforce-portfolio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub-ready monorepo containing three Lovable-generated TanStack Start React portfolio apps and a Railway backend proxy starter.",
+  "workspaces": [
+    "frontend-apps/01-unified-profile",
+    "frontend-apps/02-agentforce-guardrail-chat",
+    "frontend-apps/03-agentforce-commerce-analytics",
+    "backend-proxy"
+  ],
+  "scripts": {
+    "dev:unified": "npm --workspace frontend-apps/01-unified-profile run dev",
+    "dev:chat": "npm --workspace frontend-apps/02-agentforce-guardrail-chat run dev",
+    "dev:analytics": "npm --workspace frontend-apps/03-agentforce-commerce-analytics run dev",
+    "dev:backend": "npm --workspace backend-proxy run dev",
+    "build:unified": "npm --workspace frontend-apps/01-unified-profile run build",
+    "build:chat": "npm --workspace frontend-apps/02-agentforce-guardrail-chat run build",
+    "build:analytics": "npm --workspace frontend-apps/03-agentforce-commerce-analytics run build"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
