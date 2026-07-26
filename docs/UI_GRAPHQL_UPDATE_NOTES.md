@@ -36,3 +36,12 @@ with a controlled Salesforce GraphQL UI API query against Account records. This 
 4. If either does not redeploy automatically, use Vercel → Deployments → Redeploy.
 5. Confirm the `VITE_BACKEND_PROXY_URL` variable exists in the Commerce Analytics Vercel project.
 6. Confirm Railway CORS allows `https://salesforce-agentforce-analytics.vercel.app`.
+
+## Follow-up patch: safer interactivity and live label
+
+This patch adds two focused improvements to the Commerce Analytics Console:
+
+1. The response footer now changes from `mock until live test runs` to `live Salesforce GraphQL response` after the live Railway → Salesforce GraphQL request succeeds.
+2. The live proxy panel now includes a controlled GraphQL preset selector for 3, 5, or 10 Account records.
+
+The selector is intentionally allowlisted. It changes only the `Account(first: n)` record limit and does not expose a raw public GraphQL editor. This keeps the demo interactive while avoiding an unrestricted browser-to-Salesforce query surface.

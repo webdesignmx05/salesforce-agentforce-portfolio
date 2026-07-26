@@ -36,10 +36,24 @@ export const Route = createFileRoute("/")({
  * VITE_BACKEND_PROXY_URL points to the Railway backend and
  * SALESFORCE_ENABLE_LIVE=true in Railway.
  * ============================================================ */
-const graphqlQuery = `query SalesforceAccountIntel {
+type GraphQLQueryPreset = {
+  key: "accounts3" | "accounts5" | "accounts10";
+  label: string;
+  hint: string;
+  limit: number;
+};
+
+const graphQLQueryPresets: GraphQLQueryPreset[] = [
+  { key: "accounts3", label: "3 Accounts", hint: "small sample", limit: 3 },
+  { key: "accounts5", label: "5 Accounts", hint: "default proof", limit: 5 },
+  { key: "accounts10", label: "10 Accounts", hint: "larger page", limit: 10 },
+];
+
+function buildAccountGraphQLQuery(limit: number) {
+  return `query SalesforceAccountIntel {
   uiapi {
     query {
-      Account(first: 5) {
+      Account(first: ${limit}) {
         edges {
           node {
             Id
@@ -53,6 +67,8 @@ const graphqlQuery = `query SalesforceAccountIntel {
     }
   }
 }`;
+}
+
 
 // Simulated response payload — replace with SF GraphQL endpoint result
 const mockGraphQLResponse = {
@@ -175,7 +191,7 @@ function extractGraphQLAccounts(payload: unknown): LiveGraphQLAccount[] {
   });
 }
 
-async function fetchLiveGraphQLAccounts(): Promise<{ records: LiveGraphQLAccount[]; raw: unknown }> {
+async function fetchLiveGraphQLAccounts(query: string): Promise<{ records: LiveGraphQLAccount[]; raw: unknown }> {
   if (!BACKEND_PROXY_URL) {
     throw new Error(
       "Missing VITE_BACKEND_PROXY_URL. Add the Railway backend URL in this Vercel project's Environment Variables.",
@@ -185,7 +201,7 @@ async function fetchLiveGraphQLAccounts(): Promise<{ records: LiveGraphQLAccount
   const response = await fetch(`${BACKEND_PROXY_URL}/api/salesforce/graphql`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query: graphqlQuery }),
+    body: JSON.stringify({ query }),
   });
 
   const payload = await response.json();
@@ -207,6 +223,7 @@ async function fetchLiveGraphQLAccounts(): Promise<{ records: LiveGraphQLAccount
 
 function Dashboard() {
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [activeQueryPreset, setActiveQueryPreset] = useState<GraphQLQueryPreset>(graphQLQueryPresets[1]);
   const [latency, setLatency] = useState(42);
   const [handoffs, setHandoffs] = useState(7);
   const [revenue, setRevenue] = useState(8_420_000);
@@ -233,6 +250,11 @@ function Dashboard() {
     [filter],
   );
 
+  const activeGraphQLQuery = useMemo(
+    () => buildAccountGraphQLQuery(activeQueryPreset.limit),
+    [activeQueryPreset],
+  );
+
   const jsonString = useMemo(
     () => JSON.stringify(liveGraphQL.raw || mockGraphQLResponse, null, 2),
     [liveGraphQL.raw],
@@ -241,7 +263,7 @@ function Dashboard() {
   const loadLiveGraphQLAccounts = async () => {
     setLiveGraphQL((current) => ({ ...current, loading: true, error: null }));
     try {
-      const result = await fetchLiveGraphQLAccounts();
+      const result = await fetchLiveGraphQLAccounts(activeGraphQLQuery);
       setLiveGraphQL({
         loading: false,
         error: null,
@@ -326,12 +348,18 @@ function Dashboard() {
 
         {/* TOP: GraphQL IDE + JSON RESPONSE */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <QueryIDE query={graphqlQuery} />
-          <ResponseViewer json={jsonString} latency={latency} />
+          <QueryIDE query={activeGraphQLQuery} />
+          <ResponseViewer json={jsonString} latency={latency} isLive={Boolean(liveGraphQL.raw)} />
         </section>
 
         {/* LIVE GRAPHQL PROXY TEST */}
-        <LiveGraphQLProxyPanel state={liveGraphQL} onRun={loadLiveGraphQLAccounts} />
+        <LiveGraphQLProxyPanel
+          state={liveGraphQL}
+          presets={graphQLQueryPresets}
+          activePreset={activeQueryPreset}
+          onPresetChange={setActiveQueryPreset}
+          onRun={loadLiveGraphQLAccounts}
+        />
 
         {/* MIDDLE: KPI CARDS */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -515,9 +543,15 @@ function QueryIDE({ query }: { query: string }) {
 
 function LiveGraphQLProxyPanel({
   state,
+  presets,
+  activePreset,
+  onPresetChange,
   onRun,
 }: {
   state: LiveGraphQLState;
+  presets: GraphQLQueryPreset[];
+  activePreset: GraphQLQueryPreset;
+  onPresetChange: (preset: GraphQLQueryPreset) => void;
   onRun: () => void;
 }) {
   return (
@@ -533,6 +567,30 @@ function LiveGraphQLProxyPanel({
             the Commerce Analytics demo can call Salesforce without exposing the Consumer Secret in the browser. The visual dashboard
             below can still remain simulated until you decide to map more Salesforce objects into the UI.
           </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {presets.map((preset) => {
+              const active = preset.key === activePreset.key;
+              return (
+                <button
+                  key={preset.key}
+                  type="button"
+                  onClick={() => onPresetChange(preset)}
+                  disabled={state.loading}
+                  className={`rounded-md border px-3 py-2 text-xs font-mono uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    active
+                      ? "border-[var(--cyber-green)] text-[var(--cyber-green)] glow-blue"
+                      : "border-border text-muted-foreground hover:border-[var(--electric-blue)] hover:text-foreground"
+                  }`}
+                >
+                  <span className="block">{preset.label}</span>
+                  <span className="block text-[10px] normal-case tracking-normal opacity-70">{preset.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+            Security note: this demo changes only an allowlisted Account record limit. It does not expose a raw public GraphQL editor.
+          </p>
         </div>
         <button
           type="button"
@@ -540,7 +598,7 @@ function LiveGraphQLProxyPanel({
           disabled={state.loading}
           className="rounded-md border border-[var(--electric-blue)] px-4 py-3 text-sm font-mono uppercase tracking-wider text-[var(--electric-blue)] glow-blue transition hover:bg-[var(--electric-blue)]/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {state.loading ? "Running Query…" : "Run Live GraphQL Test"}
+          {state.loading ? `Running ${activePreset.label}…` : "Run Live GraphQL Test"}
         </button>
       </div>
 
@@ -594,7 +652,15 @@ function LiveGraphQLProxyPanel({
   );
 }
 
-function ResponseViewer({ json, latency }: { json: string; latency: number }) {
+function ResponseViewer({
+  json,
+  latency,
+  isLive,
+}: {
+  json: string;
+  latency: number;
+  isLive: boolean;
+}) {
   return (
     <div className="panel overflow-hidden flex flex-col">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-[var(--surface-2)]/50">
@@ -616,7 +682,9 @@ function ResponseViewer({ json, latency }: { json: string; latency: number }) {
         <code dangerouslySetInnerHTML={{ __html: highlightJSON(json) }} />
       </pre>
       <div className="flex items-center justify-between px-4 py-2 border-t border-border text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-        <span>response body · mock until live test runs</span>
+        <span>
+          response body · {isLive ? "live Salesforce GraphQL response" : "mock until live test runs"}
+        </span>
         <span>
           PROXY <span className="text-[var(--electric-blue)]">READY</span>
         </span>
