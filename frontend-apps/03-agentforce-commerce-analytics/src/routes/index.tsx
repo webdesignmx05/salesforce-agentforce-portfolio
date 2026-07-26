@@ -30,37 +30,99 @@ export const Route = createFileRoute("/")({
  * Salesforce Developer Edition org. It uses Salesforce GraphQL
  * UI API through the Railway proxy endpoint:
  *
- *   POST /api/salesforce/graphql
+ *   POST /api/salesforce/graphql/account-query
  *
  * This is a live Salesforce GraphQL API demonstration when
  * VITE_BACKEND_PROXY_URL points to the Railway backend and
  * SALESFORCE_ENABLE_LIVE=true in Railway.
  * ============================================================ */
-type GraphQLQueryPreset = {
-  key: "accounts3" | "accounts5" | "accounts10";
-  label: string;
-  hint: string;
-  limit: number;
-};
+type NavKey = "pipeline" | "accounts" | "agents" | "forecast" | "ops";
 
-const graphQLQueryPresets: GraphQLQueryPreset[] = [
-  { key: "accounts3", label: "3 Accounts", hint: "small sample", limit: 3 },
-  { key: "accounts5", label: "5 Accounts", hint: "default proof", limit: 5 },
-  { key: "accounts10", label: "10 Accounts", hint: "larger page", limit: 10 },
+const navTabs: { key: NavKey; label: string; hint: string }[] = [
+  { key: "pipeline", label: "Pipeline", hint: "simulated opportunity grid" },
+  { key: "accounts", label: "Accounts", hint: "live Salesforce GraphQL" },
+  { key: "agents", label: "Agents", hint: "simulated handoffs" },
+  { key: "forecast", label: "Forecast", hint: "mock revenue outlook" },
+  { key: "ops", label: "Ops", hint: "proxy health concept" },
 ];
 
-function buildAccountGraphQLQuery(limit: number) {
+type AccountLimit = 3 | 5 | 10;
+type AccountFieldMode = "basic" | "expanded";
+type AccountIndustryFilter =
+  | "all"
+  | "Electronics"
+  | "Apparel"
+  | "Construction"
+  | "Consulting"
+  | "Hospitality";
+type AccountTypeFilter = "all" | "Customer - Direct" | "Customer - Channel";
+
+type GraphQLAccountControls = {
+  limit: AccountLimit;
+  industry: AccountIndustryFilter;
+  accountType: AccountTypeFilter;
+  fieldMode: AccountFieldMode;
+};
+
+const accountLimitOptions: AccountLimit[] = [3, 5, 10];
+
+const accountIndustryOptions: { value: AccountIndustryFilter; label: string }[] = [
+  { value: "all", label: "All industries" },
+  { value: "Electronics", label: "Electronics" },
+  { value: "Apparel", label: "Apparel" },
+  { value: "Construction", label: "Construction" },
+  { value: "Consulting", label: "Consulting" },
+  { value: "Hospitality", label: "Hospitality" },
+];
+
+const accountTypeOptions: { value: AccountTypeFilter; label: string }[] = [
+  { value: "all", label: "All account types" },
+  { value: "Customer - Direct", label: "Customer - Direct" },
+  { value: "Customer - Channel", label: "Customer - Channel" },
+];
+
+const accountFieldModeOptions: { value: AccountFieldMode; label: string; hint: string }[] = [
+  { value: "basic", label: "Basic fields", hint: "Name, Industry, Type, Website" },
+  { value: "expanded", label: "Expanded fields", hint: "Adds Owner.Name relationship" },
+];
+
+const defaultGraphQLControls: GraphQLAccountControls = {
+  limit: 5,
+  industry: "all",
+  accountType: "all",
+  fieldMode: "basic",
+};
+
+function quoteGraphQLValue(value: string) {
+  return JSON.stringify(value);
+}
+
+function buildAccountGraphQLQuery(controls: GraphQLAccountControls) {
+  const filters = [
+    controls.industry !== "all" ? `Industry: { eq: ${quoteGraphQLValue(controls.industry)} }` : null,
+    controls.accountType !== "all" ? `Type: { eq: ${quoteGraphQLValue(controls.accountType)} }` : null,
+  ].filter(Boolean);
+
+  const whereArg = filters.length ? `, where: { ${filters.join(", ")} }` : "";
+  const expandedFields =
+    controls.fieldMode === "expanded"
+      ? `
+            Owner {
+              Name { value }
+            }`
+      : "";
+
   return `query SalesforceAccountIntel {
   uiapi {
     query {
-      Account(first: ${limit}) {
+      Account(first: ${controls.limit}${whereArg}) {
         edges {
           node {
             Id
             Name { value }
             Industry { value }
             Type { value }
-            Website { value }
+            Website { value }${expandedFields}
           }
         }
       }
@@ -68,7 +130,6 @@ function buildAccountGraphQLQuery(limit: number) {
   }
 }`;
 }
-
 
 // Simulated response payload — replace with SF GraphQL endpoint result
 const mockGraphQLResponse = {
@@ -150,6 +211,7 @@ type LiveGraphQLAccount = {
   industry: string;
   type: string;
   website: string;
+  owner: string;
 };
 
 type LiveGraphQLState = {
@@ -187,21 +249,27 @@ function extractGraphQLAccounts(payload: unknown): LiveGraphQLAccount[] {
       industry: valueOf(node.Industry),
       type: valueOf(node.Type),
       website: valueOf(node.Website),
+      owner:
+        node.Owner && typeof node.Owner === "object"
+          ? valueOf((node.Owner as Record<string, unknown>).Name)
+          : "—",
     };
   });
 }
 
-async function fetchLiveGraphQLAccounts(query: string): Promise<{ records: LiveGraphQLAccount[]; raw: unknown }> {
+async function fetchLiveGraphQLAccounts(
+  controls: GraphQLAccountControls,
+): Promise<{ records: LiveGraphQLAccount[]; raw: unknown }> {
   if (!BACKEND_PROXY_URL) {
     throw new Error(
       "Missing VITE_BACKEND_PROXY_URL. Add the Railway backend URL in this Vercel project's Environment Variables.",
     );
   }
 
-  const response = await fetch(`${BACKEND_PROXY_URL}/api/salesforce/graphql`, {
+  const response = await fetch(`${BACKEND_PROXY_URL}/api/salesforce/graphql/account-query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify(controls),
   });
 
   const payload = await response.json();
@@ -223,7 +291,8 @@ async function fetchLiveGraphQLAccounts(query: string): Promise<{ records: LiveG
 
 function Dashboard() {
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [activeQueryPreset, setActiveQueryPreset] = useState<GraphQLQueryPreset>(graphQLQueryPresets[1]);
+  const [activeNavTab, setActiveNavTab] = useState<NavKey>("pipeline");
+  const [graphQLControls, setGraphQLControls] = useState<GraphQLAccountControls>(defaultGraphQLControls);
   const [latency, setLatency] = useState(42);
   const [handoffs, setHandoffs] = useState(7);
   const [revenue, setRevenue] = useState(8_420_000);
@@ -251,8 +320,8 @@ function Dashboard() {
   );
 
   const activeGraphQLQuery = useMemo(
-    () => buildAccountGraphQLQuery(activeQueryPreset.limit),
-    [activeQueryPreset],
+    () => buildAccountGraphQLQuery(graphQLControls),
+    [graphQLControls],
   );
 
   const jsonString = useMemo(
@@ -263,7 +332,7 @@ function Dashboard() {
   const loadLiveGraphQLAccounts = async () => {
     setLiveGraphQL((current) => ({ ...current, loading: true, error: null }));
     try {
-      const result = await fetchLiveGraphQLAccounts(activeGraphQLQuery);
+      const result = await fetchLiveGraphQLAccounts(graphQLControls);
       setLiveGraphQL({
         loading: false,
         error: null,
@@ -279,6 +348,38 @@ function Dashboard() {
       }));
     }
   };
+
+  const handleNavSelect = (tab: NavKey) => {
+    setActiveNavTab(tab);
+    if (tab === "accounts" && !liveGraphQL.loading && liveGraphQL.records.length === 0) {
+      void loadLiveGraphQLAccounts();
+    }
+  };
+
+  const handleGraphQLControlsChange = (nextControls: GraphQLAccountControls) => {
+    setGraphQLControls(nextControls);
+    setLiveGraphQL({
+      loading: false,
+      error: null,
+      records: [],
+      raw: null,
+      lastUpdated: null,
+    });
+  };
+
+  const pageEyebrow =
+    activeNavTab === "accounts"
+      ? "Sector 7 · Live Account GraphQL"
+      : activeNavTab === "pipeline"
+      ? "Sector 7 · Revenue Intelligence"
+      : "Sector 7 · Console Preview";
+
+  const pageTitle =
+    activeNavTab === "accounts"
+      ? "Live Salesforce Account Query"
+      : activeNavTab === "pipeline"
+      ? "Real-time Salesforce Intelligence"
+      : `${navTabs.find((tab) => tab.key === activeNavTab)?.label} View Preview`;
 
   return (
     <div className="min-h-screen grid-bg">
@@ -299,18 +400,24 @@ function Dashboard() {
           </div>
 
           <nav className="hidden md:flex gap-1 ml-4 text-xs font-mono uppercase tracking-wider">
-            {["Pipeline", "Accounts", "Agents", "Forecast", "Ops"].map((n, i) => (
-              <button
-                key={n}
-                className={`px-3 py-1.5 rounded-md transition ${
-                  i === 0
-                    ? "bg-[var(--surface-2)] text-[var(--neon-pink)] glow-pink"
-                    : "text-muted-foreground hover:text-foreground hover:bg-[var(--surface-2)]"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
+            {navTabs.map((tab) => {
+              const active = tab.key === activeNavTab;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  title={tab.hint}
+                  onClick={() => handleNavSelect(tab.key)}
+                  className={`px-3 py-1.5 rounded-md transition ${
+                    active
+                      ? "bg-[var(--surface-2)] text-[var(--neon-pink)] glow-pink"
+                      : "text-muted-foreground hover:text-foreground hover:bg-[var(--surface-2)]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </nav>
 
           <div className="ml-auto flex items-center gap-4 text-xs font-mono">
@@ -331,10 +438,10 @@ function Dashboard() {
         <div className="flex items-end justify-between flex-wrap gap-4">
           <div>
             <div className="text-xs font-mono uppercase tracking-[0.3em] text-[var(--electric-blue)]">
-              Sector 7 · Revenue Intelligence
+              {pageEyebrow}
             </div>
             <h1 className="mt-1 text-3xl md:text-4xl font-semibold text-gradient-cyber">
-              Real-time Salesforce Intelligence
+              {pageTitle}
             </h1>
           </div>
           <div className="flex gap-2 text-xs font-mono">
@@ -355,9 +462,8 @@ function Dashboard() {
         {/* LIVE GRAPHQL PROXY TEST */}
         <LiveGraphQLProxyPanel
           state={liveGraphQL}
-          presets={graphQLQueryPresets}
-          activePreset={activeQueryPreset}
-          onPresetChange={setActiveQueryPreset}
+          controls={graphQLControls}
+          onControlsChange={handleGraphQLControlsChange}
           onRun={loadLiveGraphQLAccounts}
         />
 
@@ -484,7 +590,7 @@ function Dashboard() {
 
         <footer className="text-[10px] font-mono uppercase tracking-[0.3em] text-muted-foreground py-4 text-center">
           Nexus BI · GraphQL UI fixed · Live proxy test uses{" "}
-          <span className="text-[var(--electric-blue)]">/api/salesforce/graphql</span>
+          <span className="text-[var(--electric-blue)]">/api/salesforce/graphql/account-query</span>
         </footer>
       </main>
     </div>
@@ -532,9 +638,9 @@ function QueryIDE({ query }: { query: string }) {
         <div className="pointer-events-none absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--electric-blue)] to-transparent animate-scan opacity-60" />
       </div>
       <div className="flex items-center justify-between px-4 py-2 border-t border-border text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-        <span>Safe Account query · GraphQL UI API</span>
+        <span>Controlled Account query · server-side allowlist</span>
         <span>
-          Endpoint <span className="text-[var(--electric-blue)]">/api/salesforce/graphql</span>
+          Endpoint <span className="text-[var(--electric-blue)]">/api/salesforce/graphql/account-query</span>
         </span>
       </div>
     </div>
@@ -543,53 +649,120 @@ function QueryIDE({ query }: { query: string }) {
 
 function LiveGraphQLProxyPanel({
   state,
-  presets,
-  activePreset,
-  onPresetChange,
+  controls,
+  onControlsChange,
   onRun,
 }: {
   state: LiveGraphQLState;
-  presets: GraphQLQueryPreset[];
-  activePreset: GraphQLQueryPreset;
-  onPresetChange: (preset: GraphQLQueryPreset) => void;
+  controls: GraphQLAccountControls;
+  onControlsChange: (controls: GraphQLAccountControls) => void;
   onRun: () => void;
 }) {
+  const updateControls = (patch: Partial<GraphQLAccountControls>) => {
+    onControlsChange({ ...controls, ...patch });
+  };
+
   return (
     <section className="panel p-5">
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
-        <div className="max-w-3xl">
+      <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
+        <div className="max-w-4xl">
           <div className="text-xs font-mono uppercase tracking-[0.3em] text-[var(--cyber-green)]">
             Live Salesforce GraphQL Proxy Test
           </div>
           <h2 className="mt-2 text-2xl font-semibold">Railway → Salesforce GraphQL API</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            This panel runs a controlled GraphQL query through the same Railway backend proxy pattern used by App 1. It proves that
-            the Commerce Analytics demo can call Salesforce without exposing the Consumer Secret in the browser. The visual dashboard
-            below can still remain simulated until you decide to map more Salesforce objects into the UI.
+            This panel turns the Accounts tab into a controlled live GraphQL demo. The browser can change
+            record count, filter criteria, and field shape, but Railway rebuilds the allowlisted Account query
+            before sending it to Salesforce. This demonstrates GraphQL field selection without exposing
+            Salesforce credentials or a raw public query console.
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {presets.map((preset) => {
-              const active = preset.key === activePreset.key;
-              return (
-                <button
-                  key={preset.key}
-                  type="button"
-                  onClick={() => onPresetChange(preset)}
-                  disabled={state.loading}
-                  className={`rounded-md border px-3 py-2 text-xs font-mono uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                    active
-                      ? "border-[var(--cyber-green)] text-[var(--cyber-green)] glow-blue"
-                      : "border-border text-muted-foreground hover:border-[var(--electric-blue)] hover:text-foreground"
-                  }`}
-                >
-                  <span className="block">{preset.label}</span>
-                  <span className="block text-[10px] normal-case tracking-normal opacity-70">{preset.hint}</span>
-                </button>
-              );
-            })}
+
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+            <label className="block rounded-md border border-border bg-[var(--surface-2)]/40 p-3">
+              <span className="block text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                Record count
+              </span>
+              <select
+                value={controls.limit}
+                disabled={state.loading}
+                onChange={(event) => updateControls({ limit: Number(event.target.value) as AccountLimit })}
+                className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+              >
+                {accountLimitOptions.map((limit) => (
+                  <option key={limit} value={limit}>
+                    {limit} Accounts
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block rounded-md border border-border bg-[var(--surface-2)]/40 p-3">
+              <span className="block text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                Industry filter
+              </span>
+              <select
+                value={controls.industry}
+                disabled={state.loading}
+                onChange={(event) => updateControls({ industry: event.target.value as AccountIndustryFilter })}
+                className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+              >
+                {accountIndustryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block rounded-md border border-border bg-[var(--surface-2)]/40 p-3">
+              <span className="block text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                Type filter
+              </span>
+              <select
+                value={controls.accountType}
+                disabled={state.loading}
+                onChange={(event) => updateControls({ accountType: event.target.value as AccountTypeFilter })}
+                className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+              >
+                {accountTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="rounded-md border border-border bg-[var(--surface-2)]/40 p-3">
+              <span className="block text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                Field shape
+              </span>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {accountFieldModeOptions.map((option) => {
+                  const active = option.value === controls.fieldMode;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      disabled={state.loading}
+                      onClick={() => updateControls({ fieldMode: option.value })}
+                      title={option.hint}
+                      className={`rounded-md border px-2 py-2 text-xs font-mono uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        active
+                          ? "border-[var(--cyber-green)] text-[var(--cyber-green)] glow-blue"
+                          : "border-border text-muted-foreground hover:border-[var(--electric-blue)] hover:text-foreground"
+                      }`}
+                    >
+                      {option.value}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
+
           <p className="mt-3 text-xs leading-5 text-muted-foreground">
-            Security note: this demo changes only an allowlisted Account record limit. It does not expose a raw public GraphQL editor.
+            Security note: the visible query updates as you change controls, but the backend still validates the
+            same allowlisted limit, filter, and field-shape options before calling Salesforce.
           </p>
         </div>
         <button
@@ -598,7 +771,7 @@ function LiveGraphQLProxyPanel({
           disabled={state.loading}
           className="rounded-md border border-[var(--electric-blue)] px-4 py-3 text-sm font-mono uppercase tracking-wider text-[var(--electric-blue)] glow-blue transition hover:bg-[var(--electric-blue)]/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {state.loading ? `Running ${activePreset.label}…` : "Run Live GraphQL Test"}
+          {state.loading ? "Running controlled query…" : "Run Controlled GraphQL Query"}
         </button>
       </div>
 
@@ -617,6 +790,7 @@ function LiveGraphQLProxyPanel({
               <th className="py-3 px-3">Industry</th>
               <th className="py-3 px-3">Type</th>
               <th className="py-3 px-3">Website</th>
+              {controls.fieldMode === "expanded" && <th className="py-3 px-3">Owner</th>}
             </tr>
           </thead>
           <tbody>
@@ -628,14 +802,17 @@ function LiveGraphQLProxyPanel({
                   <td className="py-3 px-3 text-muted-foreground">{record.industry}</td>
                   <td className="py-3 px-3 text-muted-foreground">{record.type}</td>
                   <td className="py-3 px-3 text-muted-foreground">{record.website}</td>
+                  {controls.fieldMode === "expanded" && (
+                    <td className="py-3 px-3 text-muted-foreground">{record.owner}</td>
+                  )}
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                <td colSpan={controls.fieldMode === "expanded" ? 6 : 5} className="py-6 text-center text-muted-foreground">
                   {state.loading
                     ? "Waiting for Salesforce GraphQL response…"
-                    : "Click Run Live GraphQL Test to fetch Account records from Salesforce."}
+                    : "Click Run Controlled GraphQL Query to fetch Account records from Salesforce."}
                 </td>
               </tr>
             )}
@@ -646,6 +823,7 @@ function LiveGraphQLProxyPanel({
       <div className="mt-3 flex flex-wrap gap-3 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
         <span>Mode: {state.raw ? "live response" : "not run"}</span>
         <span>Last updated: {state.lastUpdated || "—"}</span>
+        <span>Fields: {controls.fieldMode}</span>
         <span>Credentials: Railway only</span>
       </div>
     </section>

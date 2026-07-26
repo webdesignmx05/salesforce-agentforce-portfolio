@@ -47,3 +47,30 @@ SALESFORCE_API_VERSION=v64.0
 ```
 
 Do not commit real secrets to GitHub.
+
+## Controlled GraphQL endpoint
+
+The Commerce Analytics app should use the controlled endpoint below instead of a raw public GraphQL passthrough:
+
+```text
+POST /api/salesforce/graphql/account-query
+```
+
+Expected body:
+
+```json
+{
+  "limit": 5,
+  "industry": "all",
+  "accountType": "all",
+  "fieldMode": "basic"
+}
+```
+
+The backend validates those controls and rebuilds the Salesforce Account GraphQL query server-side. This keeps the public demo interactive while limiting it to an allowlisted Account query pattern.
+
+Keep raw GraphQL disabled for the public portfolio unless you intentionally need it for private development:
+
+```text
+SALESFORCE_ALLOW_RAW_GRAPHQL=false
+```

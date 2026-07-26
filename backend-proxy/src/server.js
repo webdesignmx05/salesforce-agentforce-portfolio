@@ -7,6 +7,7 @@ import morgan from 'morgan';
 const app = express();
 const PORT = process.env.PORT || 3000;
 const liveMode = String(process.env.SALESFORCE_ENABLE_LIVE || 'false').toLowerCase() === 'true';
+const allowRawGraphQL = String(process.env.SALESFORCE_ALLOW_RAW_GRAPHQL || 'false').toLowerCase() === 'true';
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:3000')
   .split(',')
   .map((origin) => origin.trim())
@@ -112,6 +113,103 @@ function mockGraphQLAnalytics() {
   };
 }
 
+
+const ACCOUNT_LIMITS = new Set([3, 5, 10]);
+const ACCOUNT_INDUSTRIES = new Set(['all', 'Electronics', 'Apparel', 'Construction', 'Consulting', 'Hospitality']);
+const ACCOUNT_TYPES = new Set(['all', 'Customer - Direct', 'Customer - Channel']);
+const ACCOUNT_FIELD_MODES = new Set(['basic', 'expanded']);
+
+const mockAccountRows = [
+  { id: '001g500000NWC7tAAH', name: 'Edge Communications', industry: 'Electronics', type: 'Customer - Direct', website: 'http://edgecomm.com', owner: 'M. Okafor' },
+  { id: '001g500000NWC7uAAH', name: 'Burlington Textiles Corp of America', industry: 'Apparel', type: 'Customer - Direct', website: 'www.burlington.com', owner: 'S. Kaur' },
+  { id: '001g500000NWC7vAAH', name: 'Pyramid Construction Inc.', industry: 'Construction', type: 'Customer - Channel', website: 'www.pyramid.com', owner: 'J. Chen' },
+  { id: '001g500000NWC7wAAH', name: 'Dickenson plc', industry: 'Consulting', type: 'Customer - Channel', website: 'dickenson-consulting.com', owner: 'R. Alvarez' },
+  { id: '001g500000NWC7xAAH', name: 'Grand Hotels & Resorts Ltd', industry: 'Hospitality', type: 'Customer - Direct', website: 'www.grandhotels.com', owner: 'M. Okafor' },
+];
+
+function normalizeControlledAccountQuery(body = {}) {
+  const limit = Number(body.limit || 5);
+  const industry = body.industry || 'all';
+  const accountType = body.accountType || 'all';
+  const fieldMode = body.fieldMode || 'basic';
+
+  if (!ACCOUNT_LIMITS.has(limit)) {
+    throw new Error('Invalid Account GraphQL limit. Allowed values: 3, 5, 10.');
+  }
+  if (!ACCOUNT_INDUSTRIES.has(industry)) {
+    throw new Error('Invalid Account industry filter. Use one of the allowlisted values.');
+  }
+  if (!ACCOUNT_TYPES.has(accountType)) {
+    throw new Error('Invalid Account type filter. Use one of the allowlisted values.');
+  }
+  if (!ACCOUNT_FIELD_MODES.has(fieldMode)) {
+    throw new Error('Invalid fieldMode. Allowed values: basic, expanded.');
+  }
+
+  return { limit, industry, accountType, fieldMode };
+}
+
+function graphQLString(value) {
+  return JSON.stringify(String(value));
+}
+
+function buildControlledAccountGraphQLQuery({ limit, industry, accountType, fieldMode }) {
+  const filters = [
+    industry !== 'all' ? `Industry: { eq: ${graphQLString(industry)} }` : null,
+    accountType !== 'all' ? `Type: { eq: ${graphQLString(accountType)} }` : null,
+  ].filter(Boolean);
+  const whereArg = filters.length ? `, where: { ${filters.join(', ')} }` : '';
+  const expandedFields = fieldMode === 'expanded' ? `
+            Owner {
+              Name { value }
+            }` : '';
+
+  return `query SalesforceAccountIntel {
+  uiapi {
+    query {
+      Account(first: ${limit}${whereArg}) {
+        edges {
+          node {
+            Id
+            Name { value }
+            Industry { value }
+            Type { value }
+            Website { value }${expandedFields}
+          }
+        }
+      }
+    }
+  }
+}`;
+}
+
+function mockControlledAccountGraphQLResponse(controls) {
+  const rows = mockAccountRows
+    .filter((row) => controls.industry === 'all' || row.industry === controls.industry)
+    .filter((row) => controls.accountType === 'all' || row.type === controls.accountType)
+    .slice(0, controls.limit)
+    .map((row) => ({
+      node: {
+        Id: row.id,
+        Name: { value: row.name },
+        Industry: { value: row.industry },
+        Type: { value: row.type },
+        Website: { value: row.website },
+        ...(controls.fieldMode === 'expanded' ? { Owner: { Name: { value: row.owner } } } : {}),
+      },
+    }));
+
+  return {
+    mode: 'mock',
+    data: { uiapi: { query: { Account: { edges: rows } } } },
+    extensions: {
+      controlledProxy: true,
+      fieldMode: controls.fieldMode,
+      note: 'Mock response. Enable SALESFORCE_ENABLE_LIVE=true to call Salesforce.',
+    },
+  };
+}
+
 app.get('/health', (req, res) => {
   res.json({
     ok: true,
@@ -166,8 +264,60 @@ app.post('/api/salesforce/soql', async (req, res) => {
   }
 });
 
+// Controlled Account GraphQL proxy. This keeps public interaction allowlisted while still using live Salesforce GraphQL.
+app.post('/api/salesforce/graphql/account-query', async (req, res) => {
+  let controls;
+  try {
+    controls = normalizeControlledAccountQuery(req.body || {});
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const query = buildControlledAccountGraphQLQuery(controls);
+
+  try {
+    if (!liveMode) {
+      return res.json({
+        ...mockControlledAccountGraphQLResponse(controls),
+        requestedControls: controls,
+        requestedQuery: query,
+      });
+    }
+
+    const token = await getSalesforceToken();
+    const apiVersion = process.env.SALESFORCE_API_VERSION || 'v64.0';
+    const url = `${token.instanceUrl}/services/data/${apiVersion}/graphql`;
+    const sfResponse = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, variables: {} }),
+    });
+    const payload = await sfResponse.json();
+    return res.status(sfResponse.status).json({
+      ...payload,
+      requestedControls: controls,
+      extensions: {
+        ...(payload.extensions || {}),
+        controlledProxy: true,
+        fieldMode: controls.fieldMode,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // Live GraphQL proxy example. Endpoint may vary by org/API version; validate in your Salesforce org before enabling.
 app.post('/api/salesforce/graphql', async (req, res) => {
+  if (!allowRawGraphQL) {
+    return res.status(403).json({
+      error: 'Raw GraphQL proxy is disabled. Use /api/salesforce/graphql/account-query for allowlisted Account queries.',
+    });
+  }
+
   try {
     const { query, variables } = req.body || {};
     if (!query || typeof query !== 'string') {
@@ -204,4 +354,5 @@ app.post('/api/salesforce/graphql', async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Agentforce backend proxy listening on 0.0.0.0:${PORT}`);
   console.log(`Salesforce live mode: ${liveMode ? 'ON' : 'OFF / MOCK'}`);
+  console.log(`Raw GraphQL proxy: ${allowRawGraphQL ? 'ON' : 'OFF / CONTROLLED ONLY'}`);
 });
