@@ -74,3 +74,37 @@ Keep raw GraphQL disabled for the public portfolio unless you intentionally need
 ```text
 SALESFORCE_ALLOW_RAW_GRAPHQL=false
 ```
+
+## Controlled Unified Profile SOQL endpoint
+
+The Unified Profile app should use this controlled endpoint instead of allowing raw SOQL from the public browser UI:
+
+```text
+POST /api/salesforce/profile-query
+```
+
+Expected body:
+
+```json
+{
+  "queryKey": "accounts",
+  "limit": 5
+}
+```
+
+Allowed `queryKey` values:
+
+```text
+accounts
+contacts
+opportunities
+cases
+```
+
+Allowed `limit` values:
+
+```text
+3, 5, 10
+```
+
+The backend validates those controls, builds the SOQL query server-side, calls Salesforce, and returns sanitized record fields for the frontend modal overlays. This keeps the demo interactive without letting site visitors submit arbitrary SOQL against the Salesforce org.

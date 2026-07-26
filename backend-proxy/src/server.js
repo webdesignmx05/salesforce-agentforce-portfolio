@@ -114,6 +114,165 @@ function mockGraphQLAnalytics() {
 }
 
 
+const PROFILE_QUERY_LIMITS = new Set([3, 5, 10]);
+const PROFILE_QUERY_KEYS = new Set(['accounts', 'contacts', 'opportunities', 'cases']);
+
+const mockProfileQueryRows = {
+  accounts: [
+    {
+      id: '001g500000NWC7tAAH', objectType: 'Account', name: 'Edge Communications', summary: 'Electronics · Customer - Direct', source: 'Mock Account response',
+      fields: { Industry: 'Electronics', Type: 'Customer - Direct', Website: 'http://edgecomm.com', Phone: '(512) 757-6000', Owner: 'M. Okafor' },
+    },
+    {
+      id: '001g500000NWC7uAAH', objectType: 'Account', name: 'Burlington Textiles Corp of America', summary: 'Apparel · Customer - Direct', source: 'Mock Account response',
+      fields: { Industry: 'Apparel', Type: 'Customer - Direct', Website: 'www.burlington.com', Phone: '(336) 222-7000', Owner: 'S. Kaur' },
+    },
+  ],
+  contacts: [
+    {
+      id: '003-MOCK-001', objectType: 'Contact', name: 'Rose Gonzalez', summary: 'SVP, Procurement · Edge Communications', source: 'Mock Contact response',
+      fields: { Email: 'rose.gonzalez@example.com', Title: 'SVP, Procurement', Phone: '(512) 555-0131', Account: 'Edge Communications' },
+    },
+    {
+      id: '003-MOCK-002', objectType: 'Contact', name: 'Sean Forbes', summary: 'Director, Digital · Burlington Textiles', source: 'Mock Contact response',
+      fields: { Email: 'sean.forbes@example.com', Title: 'Director, Digital', Phone: '(336) 555-0194', Account: 'Burlington Textiles Corp of America' },
+    },
+  ],
+  opportunities: [
+    {
+      id: '006-MOCK-001', objectType: 'Opportunity', name: 'Edge Installation Expansion', summary: 'Negotiation · $75,000', source: 'Mock Opportunity response',
+      fields: { Stage: 'Negotiation/Review', Amount: '$75,000', CloseDate: '2026-08-15', Account: 'Edge Communications' },
+    },
+    {
+      id: '006-MOCK-002', objectType: 'Opportunity', name: 'Burlington Renewal Q3', summary: 'Proposal · $42,000', source: 'Mock Opportunity response',
+      fields: { Stage: 'Proposal/Price Quote', Amount: '$42,000', CloseDate: '2026-09-01', Account: 'Burlington Textiles Corp of America' },
+    },
+  ],
+  cases: [
+    {
+      id: '500-MOCK-001', objectType: 'Case', name: '00001001', summary: 'New · High priority', source: 'Mock Case response',
+      fields: { Subject: 'Integration login issue', Status: 'New', Priority: 'High', Account: 'Edge Communications' },
+    },
+    {
+      id: '500-MOCK-002', objectType: 'Case', name: '00001002', summary: 'Working · Medium priority', source: 'Mock Case response',
+      fields: { Subject: 'Dashboard access request', Status: 'Working', Priority: 'Medium', Account: 'Burlington Textiles Corp of America' },
+    },
+  ],
+};
+
+function normalizeControlledProfileQuery(body = {}) {
+  const queryKey = body.queryKey || 'accounts';
+  const limit = Number(body.limit || 5);
+
+  if (!PROFILE_QUERY_KEYS.has(queryKey)) {
+    throw new Error('Invalid profile query key. Allowed values: accounts, contacts, opportunities, cases.');
+  }
+  if (!PROFILE_QUERY_LIMITS.has(limit)) {
+    throw new Error('Invalid profile query limit. Allowed values: 3, 5, 10.');
+  }
+
+  return { queryKey, limit };
+}
+
+function buildControlledProfileSoqlQuery({ queryKey, limit }) {
+  const safeQueries = {
+    accounts: `SELECT Id, Name, Industry, Type, Website, Phone, Owner.Name FROM Account LIMIT ${limit}`,
+    contacts: `SELECT Id, Name, Email, Title, Phone, Account.Name FROM Contact LIMIT ${limit}`,
+    opportunities: `SELECT Id, Name, StageName, Amount, CloseDate, Account.Name FROM Opportunity LIMIT ${limit}`,
+    cases: `SELECT Id, CaseNumber, Subject, Status, Priority, Account.Name FROM Case LIMIT ${limit}`,
+  };
+
+  return safeQueries[queryKey];
+}
+
+function moneyValue(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(value));
+}
+
+function textValue(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  return String(value);
+}
+
+function normalizeSalesforceProfileRecord(queryKey, record) {
+  if (queryKey === 'accounts') {
+    return {
+      id: record.Id,
+      objectType: 'Account',
+      name: textValue(record.Name),
+      summary: `${textValue(record.Industry)} · ${textValue(record.Type)}`,
+      source: 'Live Salesforce Account via Railway SOQL proxy',
+      fields: {
+        Industry: textValue(record.Industry),
+        Type: textValue(record.Type),
+        Website: textValue(record.Website),
+        Phone: textValue(record.Phone),
+        Owner: textValue(record.Owner?.Name),
+      },
+    };
+  }
+
+  if (queryKey === 'contacts') {
+    return {
+      id: record.Id,
+      objectType: 'Contact',
+      name: textValue(record.Name),
+      summary: `${textValue(record.Title)} · ${textValue(record.Account?.Name)}`,
+      source: 'Live Salesforce Contact via Railway SOQL proxy',
+      fields: {
+        Email: textValue(record.Email),
+        Title: textValue(record.Title),
+        Phone: textValue(record.Phone),
+        Account: textValue(record.Account?.Name),
+      },
+    };
+  }
+
+  if (queryKey === 'opportunities') {
+    return {
+      id: record.Id,
+      objectType: 'Opportunity',
+      name: textValue(record.Name),
+      summary: `${textValue(record.StageName)} · ${moneyValue(record.Amount)}`,
+      source: 'Live Salesforce Opportunity via Railway SOQL proxy',
+      fields: {
+        Stage: textValue(record.StageName),
+        Amount: moneyValue(record.Amount),
+        CloseDate: textValue(record.CloseDate),
+        Account: textValue(record.Account?.Name),
+      },
+    };
+  }
+
+  return {
+    id: record.Id,
+    objectType: 'Case',
+    name: textValue(record.CaseNumber || record.Subject || record.Id),
+    summary: `${textValue(record.Status)} · ${textValue(record.Priority)}`,
+    source: 'Live Salesforce Case via Railway SOQL proxy',
+    fields: {
+      CaseNumber: textValue(record.CaseNumber),
+      Subject: textValue(record.Subject),
+      Status: textValue(record.Status),
+      Priority: textValue(record.Priority),
+      Account: textValue(record.Account?.Name),
+    },
+  };
+}
+
+function mockControlledProfileQueryResponse(controls) {
+  const rows = mockProfileQueryRows[controls.queryKey].slice(0, controls.limit);
+  return {
+    mode: 'mock',
+    requestedControls: controls,
+    requestedQuery: buildControlledProfileSoqlQuery(controls),
+    records: rows,
+    note: 'Mock response. Enable SALESFORCE_ENABLE_LIVE=true to call Salesforce.',
+  };
+}
+
+
 const ACCOUNT_LIMITS = new Set([3, 5, 10]);
 const ACCOUNT_INDUSTRIES = new Set(['all', 'Electronics', 'Apparel', 'Construction', 'Consulting', 'Hospitality']);
 const ACCOUNT_TYPES = new Set(['all', 'Customer - Direct', 'Customer - Channel']);
@@ -234,6 +393,55 @@ app.get('/oauth/callback', (req, res) => {
 app.get('/api/demo/unified-profile', (req, res) => res.json(mockUnifiedProfile()));
 app.post('/api/demo/agent-chat', (req, res) => res.json(mockAgentReply(req.body?.message)));
 app.post('/api/demo/graphql-analytics', (req, res) => res.json(mockGraphQLAnalytics()));
+
+
+// Controlled profile SOQL proxy. This is safer than letting the browser submit arbitrary SOQL.
+app.post('/api/salesforce/profile-query', async (req, res) => {
+  let controls;
+  try {
+    controls = normalizeControlledProfileQuery(req.body || {});
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const query = buildControlledProfileSoqlQuery(controls);
+
+  try {
+    if (!liveMode) {
+      return res.json(mockControlledProfileQueryResponse(controls));
+    }
+
+    const token = await getSalesforceToken();
+    const apiVersion = process.env.SALESFORCE_API_VERSION || 'v64.0';
+    const url = `${token.instanceUrl}/services/data/${apiVersion}/query/?q=${encodeURIComponent(query)}`;
+    const sfResponse = await fetch(url, {
+      headers: { Authorization: `Bearer ${token.accessToken}` },
+    });
+    const payload = await sfResponse.json();
+
+    if (!sfResponse.ok) {
+      return res.status(sfResponse.status).json({
+        error: 'Controlled Salesforce profile query failed.',
+        requestedControls: controls,
+        requestedQuery: query,
+        salesforce: payload,
+      });
+    }
+
+    return res.json({
+      mode: 'live',
+      requestedControls: controls,
+      requestedQuery: query,
+      totalSize: payload.totalSize,
+      done: payload.done,
+      records: Array.isArray(payload.records)
+        ? payload.records.map((record) => normalizeSalesforceProfileRecord(controls.queryKey, record))
+        : [],
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 // Live SOQL proxy example. Keep disabled until you intentionally enable SALESFORCE_ENABLE_LIVE=true.
 app.post('/api/salesforce/soql', async (req, res) => {
