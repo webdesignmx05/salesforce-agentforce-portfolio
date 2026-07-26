@@ -50,3 +50,14 @@ The live test works when:
 - Railway CORS includes the Analytics app domain
 
 The lower pipeline intelligence grid remains simulated until real Salesforce opportunity or commerce objects are intentionally mapped into the dashboard UI.
+
+## Opportunity drilldown drawer
+
+The simulated Account Intelligence Grid now treats each `OPP-####` value as an interactive drilldown control. Clicking an opportunity ID opens a right-side detail drawer with:
+
+- opportunity amount, stage, probability, and owner
+- parent account and industry context
+- next-action intelligence based on stage/probability
+- a clear note that the drawer is simulated until real Opportunity records are mapped
+
+This keeps the live Salesforce GraphQL Account demo separate from the simulated opportunity grid while making the dashboard feel more realistic for a portfolio walkthrough.

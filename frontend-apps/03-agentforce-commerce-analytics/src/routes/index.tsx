@@ -177,6 +177,30 @@ type OppRecord = {
   industry: string;
 };
 
+function getOpportunityDetail(record: OppRecord) {
+  const urgency =
+    record.probability >= 85
+      ? "High confidence close path"
+      : record.probability >= 60
+      ? "Active executive follow-up"
+      : "Needs risk review";
+
+  const nextAction =
+    record.stage === "Closed Won"
+      ? "Route to post-sale onboarding and expansion planning."
+      : record.stage === "Stalled" || record.probability < 30
+      ? "Schedule recovery touchpoint and confirm blocker ownership."
+      : record.stage === "Commit"
+      ? "Confirm procurement path and final approval timeline."
+      : "Review account signals, decision timeline, and next-best action.";
+
+  const graphQLShape = record.owner.startsWith("AI")
+    ? "Opportunity + Account + Owner + AI handoff metadata"
+    : "Opportunity + Account + Owner relationship fields";
+
+  return { urgency, nextAction, graphQLShape };
+}
+
 const records: OppRecord[] = [
   { id: "OPP-8821", name: "Helios Cloud Migration", parent: "Helios Holdings", amount: 1_240_000, stage: "Negotiation", probability: 82, owner: "M. Okafor", category: "high-value", industry: "Aerospace" },
   { id: "OPP-8790", name: "Northwind Data Platform", parent: "Northwind Group", amount: 890_000, stage: "Proposal", probability: 65, owner: "S. Kaur", category: "high-value", industry: "Logistics" },
@@ -291,6 +315,7 @@ async function fetchLiveGraphQLAccounts(
 
 function Dashboard() {
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [selectedOpportunity, setSelectedOpportunity] = useState<OppRecord | null>(null);
   const [activeNavTab, setActiveNavTab] = useState<NavKey>("pipeline");
   const [graphQLControls, setGraphQLControls] = useState<GraphQLAccountControls>(defaultGraphQLControls);
   const [latency, setLatency] = useState(42);
@@ -552,8 +577,15 @@ function Dashboard() {
                     style={{ animationDelay: `${i * 40}ms` }}
                     className="animate-flip-in border-b border-border/40 hover:bg-[var(--surface-2)]/60 transition-colors"
                   >
-                    <td className="py-3 px-3 font-mono text-xs text-[var(--electric-blue)]">
-                      {r.id}
+                    <td className="py-3 px-3 font-mono text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOpportunity(r)}
+                        className="text-[var(--electric-blue)] underline decoration-[var(--electric-blue)]/40 underline-offset-4 transition hover:text-[var(--cyber-green)] hover:decoration-[var(--cyber-green)] focus:outline-none focus:ring-2 focus:ring-[var(--electric-blue)] focus:ring-offset-2 focus:ring-offset-background rounded-sm"
+                        aria-label={`Open detail drawer for ${r.id} ${r.name}`}
+                      >
+                        {r.id}
+                      </button>
                     </td>
                     <td className="py-3 px-3 font-medium">{r.name}</td>
                     <td className="py-3 px-3 text-muted-foreground">{r.parent}</td>
@@ -588,6 +620,8 @@ function Dashboard() {
           </div>
         </section>
 
+        <OpportunityDetailDrawer record={selectedOpportunity} onClose={() => setSelectedOpportunity(null)} />
+
         <footer className="text-[10px] font-mono uppercase tracking-[0.3em] text-muted-foreground py-4 text-center">
           Nexus BI · GraphQL UI fixed · Live proxy test uses{" "}
           <span className="text-[var(--electric-blue)]">/api/salesforce/graphql/account-query</span>
@@ -598,6 +632,105 @@ function Dashboard() {
 }
 
 /* ---------- Components ---------- */
+
+function OpportunityDetailDrawer({
+  record,
+  onClose,
+}: {
+  record: OppRecord | null;
+  onClose: () => void;
+}) {
+  if (!record) return null;
+
+  const detail = getOpportunityDetail(record);
+  const amount = `$${(record.amount / 1_000_000).toFixed(2)}M`;
+
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`Opportunity detail for ${record.id}`}>
+      <button
+        type="button"
+        aria-label="Close opportunity detail drawer"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <aside className="relative z-10 h-full w-full max-w-xl overflow-y-auto border-l border-[var(--electric-blue)]/30 bg-background/95 p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+          <div>
+            <div className="text-xs font-mono uppercase tracking-[0.3em] text-[var(--cyber-green)]">
+              Opportunity Drilldown
+            </div>
+            <h3 className="mt-2 text-2xl font-semibold text-gradient-cyber">{record.name}</h3>
+            <p className="mt-1 font-mono text-xs text-[var(--electric-blue)]">{record.id}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-border px-3 py-2 text-xs font-mono uppercase tracking-wider text-muted-foreground transition hover:border-[var(--electric-blue)] hover:text-foreground"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <DetailMetric label="Amount" value={amount} />
+          <DetailMetric label="Probability" value={`${record.probability}%`} />
+          <DetailMetric label="Stage" value={record.stage} />
+          <DetailMetric label="Owner" value={record.owner} />
+        </div>
+
+        <div className="mt-5 space-y-4">
+          <div className="panel p-4">
+            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
+              Account Context
+            </div>
+            <dl className="mt-3 grid grid-cols-1 gap-3 text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Parent account</dt>
+                <dd className="font-medium text-right">{record.parent}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Industry</dt>
+                <dd className="font-medium text-right">{record.industry}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Signal category</dt>
+                <dd className="font-mono text-xs uppercase text-[var(--neon-pink)] text-right">{record.category.replace("-", " ")}</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="panel p-4">
+            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
+              Action Intelligence
+            </div>
+            <p className="mt-3 text-sm leading-6 text-foreground">{detail.urgency}</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{detail.nextAction}</p>
+          </div>
+
+          <div className="panel p-4">
+            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
+              GraphQL Demonstration Note
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              This drawer is a simulated opportunity drilldown for the portfolio grid. A later live version could request
+              <span className="mx-1 font-mono text-[var(--electric-blue)]">{detail.graphQLShape}</span>
+              through the same Railway-controlled GraphQL proxy pattern.
+            </p>
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function DetailMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-border bg-[var(--surface-2)]/50 p-3">
+      <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
+      <div className="mt-2 text-lg font-semibold">{value}</div>
+    </div>
+  );
+}
 
 function QueryIDE({ query }: { query: string }) {
   const lines = query.split("\n");
