@@ -24,41 +24,29 @@ export const Route = createFileRoute("/")({
 });
 
 /* ============================================================
- * MOCK GRAPHQL STATE
+ * GRAPHQL QUERY STATE
  * ------------------------------------------------------------
- * NOTE: This is a structured simulation of the Salesforce
- * GraphQL response. Wire the real endpoint here:
+ * This query is intentionally simple and valid for a default
+ * Salesforce Developer Edition org. It uses Salesforce GraphQL
+ * UI API through the Railway proxy endpoint:
  *
- *   const { data } = useQuery(SF_QUERY);
- *   -> replace `mockGraphQLResponse` below.
+ *   POST /api/salesforce/graphql
+ *
+ * This is a live Salesforce GraphQL API demonstration when
+ * VITE_BACKEND_PROXY_URL points to the Railway backend and
+ * SALESFORCE_ENABLE_LIVE=true in Railway.
  * ============================================================ */
-const graphqlQuery = `query SalesforceIntel($limit: Int = 25) {
+const graphqlQuery = `query SalesforceAccountIntel {
   uiapi {
     query {
-      Opportunity(
-        where: { StageName: { ne: "Closed Lost" } }
-        orderBy: { Amount: { order: DESC } }
-        first: $limit
-      ) {
+      Account(first: 5) {
         edges {
           node {
             Id
             Name { value }
-            Amount { value }
-            StageName { value }
-            Probability { value }
-            CloseDate { value }
-            Account {
-              Id
-              Name { value }
-              Industry { value }
-              AnnualRevenue { value }
-              Parent {
-                Id
-                Name { value }
-              }
-            }
-            Owner { Name { value } }
+            Industry { value }
+            Type { value }
+            Website { value }
           }
         }
       }
@@ -137,11 +125,98 @@ const filters: { key: FilterKey; label: string; hint: string }[] = [
   { key: "ai-assisted", label: "Agent Assisted", hint: "AI-closed" },
 ];
 
+// ============================================================================
+// LIVE SALESFORCE GRAPHQL PROXY TYPES
+// ============================================================================
+type LiveGraphQLAccount = {
+  id: string;
+  name: string;
+  industry: string;
+  type: string;
+  website: string;
+};
+
+type LiveGraphQLState = {
+  loading: boolean;
+  error: string | null;
+  records: LiveGraphQLAccount[];
+  raw: unknown | null;
+  lastUpdated: string | null;
+};
+
+const BACKEND_PROXY_URL = import.meta.env.VITE_BACKEND_PROXY_URL as
+  | string
+  | undefined;
+
+function valueOf(field: unknown): string {
+  if (field && typeof field === "object" && "value" in field) {
+    const value = (field as { value?: unknown }).value;
+    return value == null ? "—" : String(value);
+  }
+  return "—";
+}
+
+function extractGraphQLAccounts(payload: unknown): LiveGraphQLAccount[] {
+  const root = payload as {
+    data?: { uiapi?: { query?: { Account?: { edges?: Array<{ node?: Record<string, unknown> }> } } } };
+  };
+  const edges = root.data?.uiapi?.query?.Account?.edges;
+  if (!Array.isArray(edges)) return [];
+
+  return edges.map((edge) => {
+    const node = edge.node || {};
+    return {
+      id: typeof node.Id === "string" ? node.Id : "—",
+      name: valueOf(node.Name),
+      industry: valueOf(node.Industry),
+      type: valueOf(node.Type),
+      website: valueOf(node.Website),
+    };
+  });
+}
+
+async function fetchLiveGraphQLAccounts(): Promise<{ records: LiveGraphQLAccount[]; raw: unknown }> {
+  if (!BACKEND_PROXY_URL) {
+    throw new Error(
+      "Missing VITE_BACKEND_PROXY_URL. Add the Railway backend URL in this Vercel project's Environment Variables.",
+    );
+  }
+
+  const response = await fetch(`${BACKEND_PROXY_URL}/api/salesforce/graphql`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query: graphqlQuery }),
+  });
+
+  const payload = await response.json();
+
+  if (!response.ok || payload.error) {
+    throw new Error(payload.error || `Request failed with status ${response.status}`);
+  }
+
+  if (Array.isArray(payload.errors) && payload.errors.length > 0) {
+    throw new Error(
+      payload.errors
+        .map((item: { message?: string }) => item.message || JSON.stringify(item))
+        .join(" | "),
+    );
+  }
+
+  return { records: extractGraphQLAccounts(payload), raw: payload };
+}
+
 function Dashboard() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [latency, setLatency] = useState(42);
   const [handoffs, setHandoffs] = useState(7);
   const [revenue, setRevenue] = useState(8_420_000);
+  const [liveGraphQL, setLiveGraphQL] = useState<LiveGraphQLState>({
+    loading: false,
+    error: null,
+    records: [],
+    raw: null,
+    lastUpdated: null,
+  });
 
   // Simulated live telemetry ticks
   useEffect(() => {
@@ -158,7 +233,30 @@ function Dashboard() {
     [filter],
   );
 
-  const jsonString = useMemo(() => JSON.stringify(mockGraphQLResponse, null, 2), []);
+  const jsonString = useMemo(
+    () => JSON.stringify(liveGraphQL.raw || mockGraphQLResponse, null, 2),
+    [liveGraphQL.raw],
+  );
+
+  const loadLiveGraphQLAccounts = async () => {
+    setLiveGraphQL((current) => ({ ...current, loading: true, error: null }));
+    try {
+      const result = await fetchLiveGraphQLAccounts();
+      setLiveGraphQL({
+        loading: false,
+        error: null,
+        records: result.records,
+        raw: result.raw,
+        lastUpdated: new Date().toLocaleString(),
+      });
+    } catch (error) {
+      setLiveGraphQL((current) => ({
+        ...current,
+        loading: false,
+        error: error instanceof Error ? error.message : "Unknown GraphQL request error",
+      }));
+    }
+  };
 
   return (
     <div className="min-h-screen grid-bg">
@@ -231,6 +329,9 @@ function Dashboard() {
           <QueryIDE query={graphqlQuery} />
           <ResponseViewer json={jsonString} latency={latency} />
         </section>
+
+        {/* LIVE GRAPHQL PROXY TEST */}
+        <LiveGraphQLProxyPanel state={liveGraphQL} onRun={loadLiveGraphQLAccounts} />
 
         {/* MIDDLE: KPI CARDS */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -354,8 +455,8 @@ function Dashboard() {
         </section>
 
         <footer className="text-[10px] font-mono uppercase tracking-[0.3em] text-muted-foreground py-4 text-center">
-          Nexus BI · Simulated payload · Wire endpoint at{" "}
-          <span className="text-[var(--electric-blue)]">mockGraphQLResponse</span>
+          Nexus BI · GraphQL UI fixed · Live proxy test uses{" "}
+          <span className="text-[var(--electric-blue)]">/api/salesforce/graphql</span>
         </footer>
       </main>
     </div>
@@ -365,6 +466,7 @@ function Dashboard() {
 /* ---------- Components ---------- */
 
 function QueryIDE({ query }: { query: string }) {
+  const lines = query.split("\n");
   return (
     <div className="panel overflow-hidden relative">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-[var(--surface-2)]/50">
@@ -373,29 +475,122 @@ function QueryIDE({ query }: { query: string }) {
           <span className="h-2.5 w-2.5 rounded-full bg-[var(--warning-amber)]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[var(--cyber-green)]" />
           <span className="ml-3 text-xs font-mono text-muted-foreground">
-            salesforce.query.graphql
+            salesforce.graphql.uiapi
           </span>
         </div>
         <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider">
           <span className="text-[var(--electric-blue)]">▶ Execute</span>
-          <span className="text-muted-foreground">⌘↵</span>
+          <span className="text-muted-foreground">Railway proxy</span>
         </div>
       </div>
       <div className="relative">
-        <pre className="text-xs md:text-[13px] leading-relaxed font-mono p-5 overflow-x-auto max-h-[420px]">
-          <code dangerouslySetInnerHTML={{ __html: highlightGraphQL(query) }} />
+        <pre className="text-sm md:text-[15px] leading-7 font-mono p-5 overflow-x-auto max-h-[420px]">
+          <code>
+            {lines.map((line, lineIndex) => (
+              <span key={lineIndex} className="block">
+                <span className="select-none inline-block w-8 pr-3 text-right text-muted-foreground/50">
+                  {lineIndex + 1}
+                </span>
+                {tokenizeGraphQLLine(line).map((token, tokenIndex) => (
+                  <span key={`${lineIndex}-${tokenIndex}`} className={graphQLTokenClass(token.type)}>
+                    {token.text}
+                  </span>
+                ))}
+              </span>
+            ))}
+          </code>
         </pre>
         <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[var(--neon-pink)]/10 to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--electric-blue)] to-transparent animate-scan opacity-60" />
       </div>
       <div className="flex items-center justify-between px-4 py-2 border-t border-border text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-        <span>Ln 34, Col 12 · GraphQL</span>
+        <span>Safe Account query · GraphQL UI API</span>
         <span>
-          COST <span className="text-[var(--warning-amber)]">128</span> · DEPTH{" "}
-          <span className="text-[var(--electric-blue)]">6</span>
+          Endpoint <span className="text-[var(--electric-blue)]">/api/salesforce/graphql</span>
         </span>
       </div>
     </div>
+  );
+}
+
+function LiveGraphQLProxyPanel({
+  state,
+  onRun,
+}: {
+  state: LiveGraphQLState;
+  onRun: () => void;
+}) {
+  return (
+    <section className="panel p-5">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+        <div className="max-w-3xl">
+          <div className="text-xs font-mono uppercase tracking-[0.3em] text-[var(--cyber-green)]">
+            Live Salesforce GraphQL Proxy Test
+          </div>
+          <h2 className="mt-2 text-2xl font-semibold">Railway → Salesforce GraphQL API</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            This panel runs a controlled GraphQL query through the same Railway backend proxy pattern used by App 1. It proves that
+            the Commerce Analytics demo can call Salesforce without exposing the Consumer Secret in the browser. The visual dashboard
+            below can still remain simulated until you decide to map more Salesforce objects into the UI.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={state.loading}
+          className="rounded-md border border-[var(--electric-blue)] px-4 py-3 text-sm font-mono uppercase tracking-wider text-[var(--electric-blue)] glow-blue transition hover:bg-[var(--electric-blue)]/10 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {state.loading ? "Running Query…" : "Run Live GraphQL Test"}
+        </button>
+      </div>
+
+      {state.error && (
+        <div className="mt-4 rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive-foreground">
+          <strong>GraphQL request error:</strong> {state.error}
+        </div>
+      )}
+
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground border-b border-border">
+              <th className="py-3 px-3">Salesforce ID</th>
+              <th className="py-3 px-3">Account Name</th>
+              <th className="py-3 px-3">Industry</th>
+              <th className="py-3 px-3">Type</th>
+              <th className="py-3 px-3">Website</th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.records.length > 0 ? (
+              state.records.map((record) => (
+                <tr key={record.id} className="border-b border-border/40 hover:bg-[var(--surface-2)]/60">
+                  <td className="py-3 px-3 font-mono text-xs text-[var(--electric-blue)]">{record.id}</td>
+                  <td className="py-3 px-3 font-medium">{record.name}</td>
+                  <td className="py-3 px-3 text-muted-foreground">{record.industry}</td>
+                  <td className="py-3 px-3 text-muted-foreground">{record.type}</td>
+                  <td className="py-3 px-3 text-muted-foreground">{record.website}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                  {state.loading
+                    ? "Waiting for Salesforce GraphQL response…"
+                    : "Click Run Live GraphQL Test to fetch Account records from Salesforce."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-3 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+        <span>Mode: {state.raw ? "live response" : "not run"}</span>
+        <span>Last updated: {state.lastUpdated || "—"}</span>
+        <span>Credentials: Railway only</span>
+      </div>
+    </section>
   );
 }
 
@@ -421,9 +616,9 @@ function ResponseViewer({ json, latency }: { json: string; latency: number }) {
         <code dangerouslySetInnerHTML={{ __html: highlightJSON(json) }} />
       </pre>
       <div className="flex items-center justify-between px-4 py-2 border-t border-border text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-        <span>1 edge · nested account.parent · owner</span>
+        <span>response body · mock until live test runs</span>
         <span>
-          CACHE <span className="text-[var(--electric-blue)]">HIT</span>
+          PROXY <span className="text-[var(--electric-blue)]">READY</span>
         </span>
       </div>
     </div>
@@ -533,30 +728,55 @@ function escapeHtml(s: string) {
   return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
 }
 
-function highlightGraphQL(src: string) {
-  const esc = escapeHtml(src);
-  return esc
-    .replace(/(#.*)$/gm, `<span style="color:var(--muted-foreground);font-style:italic">$1</span>`)
-    .replace(
-      /\b(query|mutation|subscription|fragment|on)\b/g,
-      `<span style="color:var(--neon-pink);font-weight:600">$1</span>`,
-    )
-    .replace(
-      /(\$[A-Za-z_][A-Za-z0-9_]*)/g,
-      `<span style="color:var(--warning-amber)">$1</span>`,
-    )
-    .replace(
-      /\b(Int|String|Float|Boolean|ID)\b/g,
-      `<span style="color:var(--violet-glow)">$1</span>`,
-    )
-    .replace(
-      /("([^"]|\\")*")/g,
-      `<span style="color:var(--cyber-green)">$1</span>`,
-    )
-    .replace(
-      /\b([A-Za-z_][A-Za-z0-9_]*)(?=\s*[:({])/g,
-      `<span style="color:var(--electric-blue)">$1</span>`,
-    );
+type GraphQLToken = {
+  text: string;
+  type: "plain" | "comment" | "keyword" | "variable" | "scalar" | "string" | "field" | "punct";
+};
+
+function tokenizeGraphQLLine(line: string): GraphQLToken[] {
+  const tokens: GraphQLToken[] = [];
+  const pattern = /(#.*$)|("(?:[^"\\]|\\.)*")|(\$[A-Za-z_][A-Za-z0-9_]*)|\b(query|mutation|subscription|fragment|on)\b|\b(Int|String|Float|Boolean|ID)\b|([{}()[\]:!,])|([A-Za-z_][A-Za-z0-9_]*)(?=\s*[:({])/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(line)) !== null) {
+    if (match.index > lastIndex) {
+      tokens.push({ text: line.slice(lastIndex, match.index), type: "plain" });
+    }
+
+    const text = match[0];
+    let type: GraphQLToken["type"] = "plain";
+    if (match[1]) type = "comment";
+    else if (match[2]) type = "string";
+    else if (match[3]) type = "variable";
+    else if (match[4]) type = "keyword";
+    else if (match[5]) type = "scalar";
+    else if (match[6]) type = "punct";
+    else if (match[7]) type = "field";
+
+    tokens.push({ text, type });
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < line.length) {
+    tokens.push({ text: line.slice(lastIndex), type: "plain" });
+  }
+
+  return tokens.length ? tokens : [{ text: line, type: "plain" }];
+}
+
+function graphQLTokenClass(type: GraphQLToken["type"]) {
+  const classes: Record<GraphQLToken["type"], string> = {
+    plain: "text-foreground",
+    comment: "text-muted-foreground italic",
+    keyword: "text-[var(--neon-pink)] font-semibold",
+    variable: "text-[var(--warning-amber)]",
+    scalar: "text-[var(--violet-glow)]",
+    string: "text-[var(--cyber-green)]",
+    field: "text-[var(--electric-blue)]",
+    punct: "text-muted-foreground",
+  };
+  return classes[type];
 }
 
 function highlightJSON(src: string) {

@@ -1,33 +1,43 @@
-# Agentforce Commerce Analytics
+# Agentforce Commerce Analytics Command Center
 
-This folder contains the Lovable-exported React/Tailwind UI for **Agentforce Commerce Analytics**.
+React/TanStack Start portfolio app generated from the Lovable UI export.
 
-## Important deployment note
+## Update notes
 
-This is a **TanStack Start** app, not a plain static Vite app. It contains `src/server.ts`, `src/start.ts`, `src/router.tsx`, and generated route files. Deploy this folder as its own Vercel project by setting the Vercel **Root Directory** to:
+This version corrects the GraphQL code rendering issue by removing the fragile `dangerouslySetInnerHTML` GraphQL highlighter. The query is now rendered with safe React token spans, preventing JSX/HTML fragments from appearing inside the code panel.
+
+The visible GraphQL query was also simplified to a safer Salesforce GraphQL UI API test query:
+
+```graphql
+query SalesforceAccountIntel {
+  uiapi {
+    query {
+      Account(first: 5) {
+        edges {
+          node {
+            Id
+            Name { value }
+            Industry { value }
+            Type { value }
+            Website { value }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+A new **Live Salesforce GraphQL Proxy Test** panel calls:
 
 ```text
-frontend-apps/03-agentforce-commerce-analytics
+POST {VITE_BACKEND_PROXY_URL}/api/salesforce/graphql
 ```
 
-Recommended Vercel environment variables:
+This keeps Salesforce credentials in Railway and proves the browser-to-Railway-to-Salesforce GraphQL path when:
 
-```text
-NITRO_PRESET=vercel
-VITE_BACKEND_PROXY_URL=https://YOUR-RAILWAY-BACKEND-URL.up.railway.app
-```
+- `VITE_BACKEND_PROXY_URL` is set in the Vercel project
+- `SALESFORCE_ENABLE_LIVE=true` is set in Railway
+- the backend proxy has valid Salesforce OAuth settings
 
-Leave `VITE_BACKEND_PROXY_URL` blank until the Railway backend is deployed. The app currently runs with mock state and does not require Salesforce credentials.
-
-## Local test
-
-```bash
-npm install
-npm run dev
-```
-
-## Build test
-
-```bash
-npm run build
-```
+The lower analytics dashboard remains simulated until real Salesforce/commerce objects are intentionally mapped into the dashboard UI.

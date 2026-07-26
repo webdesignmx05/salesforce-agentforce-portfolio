@@ -1,32 +1,22 @@
 # Portfolio Index Landing Page
 
-This optional static landing page now uses the sleeker Lovable-generated design from `index(1).html`, including the Tailwind browser script and Font Awesome icons.
-
-The only intentional change is the link strategy:
-
-- The original Lovable file linked to local build paths such as `./01-agentforce-unified-profile/dist/index.html`.
-- That path does **not** match the recommended deployment approach, because the three TanStack Start apps should be deployed as separate Vercel projects.
-- Therefore, the active `index.html` preserves the Lovable look and feel but replaces those local `dist` links with placeholder Vercel URLs.
-
-After the three app deployments are live, edit `index.html` and replace:
-
-```text
-https://REPLACE-WITH-UNIFIED-PROFILE-VERCEL-URL
-https://REPLACE-WITH-AGENTFORCE-CHAT-VERCEL-URL
-https://REPLACE-WITH-COMMERCE-ANALYTICS-VERCEL-URL
-```
-
-Recommended Vercel Root Directory for this static landing page:
+This folder contains the standalone static portfolio hub deployed to Vercel with this root directory:
 
 ```text
 frontend-apps/00-portfolio-index
 ```
 
+The active `index.html` uses a lighter, larger-text visual style and links directly to the three deployed Vercel apps:
+
+- https://salesforce-agentforce-profile.vercel.app/
+- https://salesforce-agentforce-chat.vercel.app/
+- https://salesforce-agentforce-analytics.vercel.app/
+
 No build command is needed for this static HTML folder.
 
-Reference files included:
+Reference files retained:
 
 ```text
-index.original-lovable-relative-links.html  # exact original visual file, before deployment-safe link edits
-index.placeholder-generated.html           # previous placeholder landing page, kept only for comparison
+index.original-lovable-relative-links.html  # original dark Lovable page before deployment-safe URL edits
+index.placeholder-generated.html           # earlier placeholder page kept only for comparison
 ```

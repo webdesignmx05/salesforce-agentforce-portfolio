@@ -1,105 +1,120 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Salesforce Agentforce & Data Cloud Ecosystem Portfolio</title>
-    <!-- Official Tailwind v4 Browser Engine Script -->
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Official FontAwesome v6 Icons Sheet Link -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
-    <!-- NOTE: Replace REPLACE-WITH-* links after the three Vercel app deployments are live. -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Salesforce Agentforce & Data Cloud Portfolio</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-cyan-500 selection:text-black">
+<body class="min-h-screen bg-gradient-to-br from-sky-50 via-white to-indigo-50 text-slate-900 font-sans antialiased selection:bg-cyan-200 selection:text-slate-950">
+  <div class="fixed inset-0 pointer-events-none overflow-hidden">
+    <div class="absolute -top-24 left-12 h-80 w-80 rounded-full bg-cyan-200/45 blur-3xl"></div>
+    <div class="absolute top-24 right-10 h-96 w-96 rounded-full bg-violet-200/45 blur-3xl"></div>
+    <div class="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-amber-100/60 blur-3xl"></div>
+  </div>
 
-    <!-- Glowing Background Orbs -->
-    <div class="fixed top-0 left-1/4 w-96 h-96 bg-purple-600/10 rounded-full filter blur-[100px] pointer-events-none"></div>
-    <div class="fixed bottom-0 right-1/4 w-96 h-96 bg-cyan-600/10 rounded-full filter blur-[100px] pointer-events-none"></div>
+  <div class="relative z-10 max-w-7xl mx-auto px-6 py-10 sm:py-14">
+    <header class="rounded-[2rem] border border-white/70 bg-white/80 shadow-xl shadow-slate-200/70 backdrop-blur px-7 py-8 sm:px-10 sm:py-10 mb-8">
+      <div class="flex flex-wrap items-center gap-3 mb-5">
+        <span class="inline-flex items-center gap-2 rounded-full bg-indigo-50 border border-indigo-200 px-4 py-2 text-sm font-bold uppercase tracking-[0.18em] text-indigo-700">
+          <i class="fa-solid fa-cloud-bolt"></i>
+          Enterprise Cloud Portfolio
+        </span>
+        <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700">
+          <i class="fa-solid fa-shield-halved"></i>
+          Credentials protected through Railway proxy
+        </span>
+      </div>
 
-    <div class="max-w-6xl mx-auto px-6 py-12 relative z-10">
-        
-        <!-- Header -->
-        <header class="border-b border-slate-800 pb-8 mb-12">
-            <div class="flex items-center space-x-3 mb-3">
-                <span class="bg-gradient-to-r from-purple-500 to-cyan-500 text-transparent bg-clip-text text-xs font-bold uppercase tracking-widest px-2.5 py-1 border border-purple-500/30 rounded-full bg-purple-950/20">
-                    Enterprise Cloud Portfolio
-                </span>
-            </div>
-            <h1 class="text-4xl font-extrabold tracking-tight sm:text-5xl bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                Salesforce Agentforce Ecosystem
-            </h1>
-            <p class="mt-4 text-base text-slate-400 max-w-3xl leading-relaxed">
-                A decoupled portfolio showcasing intermediate React capabilities, secure middleware API architecture, and enterprise AI integrations mapped directly to AWS Cloud Practitioner architectural standards.
-            </p>
-        </header>
+      <div class="grid grid-cols-1 lg:grid-cols-[1.2fr_.8fr] gap-8 items-center">
+        <div>
+          <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.04] text-slate-950">
+            Salesforce Agentforce & Data Cloud Portfolio Suite
+          </h1>
+          <p class="mt-6 text-lg sm:text-xl leading-8 text-slate-700 max-w-4xl">
+            A four-link portfolio hub demonstrating modern React interfaces, Vercel monorepo deployments,
+            a Railway-hosted Node.js backend proxy, and live Salesforce Developer Edition integration testing.
+          </p>
+        </div>
 
-        <!-- Project Grid -->
-        <main class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-            
-            <!-- App 1 -->
-            <div class="group border border-slate-800 hover:border-indigo-500/50 bg-slate-900/40 backdrop-blur-sm rounded-xl p-6 transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between">
-                <div>
-                    <div class="w-12 h-12 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xl mb-5 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-database"></i>
-                    </div>
-                    <span class="text-xs font-medium text-indigo-400 tracking-wider uppercase">App 01 · Basic-to-Intermediate</span>
-                    <h3 class="text-xl font-bold mt-2 mb-3 text-slate-100 group-hover:text-indigo-400 transition-colors">Unified Profile Dashboard</h3>
-                    <p class="text-sm text-slate-400 leading-relaxed mb-6">
-                        Consumes Salesforce Data Cloud REST APIs to ingest and view clean, unified multi-system customer profiles.
-                    </p>
-                </div>
-                <a href="https://salesforce-agentforce-profile.vercel.app" target="_blank" rel="noreferrer" class="inline-flex items-center justify-center w-full px-4 py-2.5 bg-slate-800 hover:bg-indigo-600 text-sm font-medium rounded-lg text-slate-200 hover:text-white transition-colors border border-slate-700 hover:border-indigo-500">
-                    Launch Application <i class="fa-solid fa-arrow-up-right-from-square ml-2 text-xs"></i>
-                </a>
-            </div>
+        <div class="rounded-3xl border border-slate-200 bg-slate-950 text-white p-6 shadow-2xl shadow-indigo-200/80">
+          <div class="text-sm uppercase tracking-[0.22em] text-cyan-300 font-bold">Architecture Pattern</div>
+          <div class="mt-4 space-y-3 text-base leading-7">
+            <div><i class="fa-brands fa-react text-cyan-300 mr-2"></i> Vercel hosts the React/TanStack apps</div>
+            <div><i class="fa-solid fa-server text-emerald-300 mr-2"></i> Railway protects Salesforce API secrets</div>
+            <div><i class="fa-brands fa-salesforce text-sky-300 mr-2"></i> Salesforce OAuth + SOQL live proof</div>
+          </div>
+        </div>
+      </div>
+    </header>
 
-            <!-- App 2 -->
-            <div class="group border border-slate-800 hover:border-purple-500/50 bg-slate-900/40 backdrop-blur-sm rounded-xl p-6 transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between">
-                <div>
-                    <div class="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 text-xl mb-5 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-robot"></i>
-                    </div>
-                    <span class="text-xs font-medium text-purple-400 tracking-wider uppercase">App 02 · Intermediate</span>
-                    <h3 class="text-xl font-bold mt-2 mb-3 text-slate-100 group-hover:text-purple-400 transition-colors">Agentforce Guardrail Chat</h3>
-                    <p class="text-sm text-slate-400 leading-relaxed mb-6">
-                        An interactive AI assistant UI routed to an Agentforce runtime instance, visualizing live grounding sources and session guardrails.
-                    </p>
-                </div>
-                <a href="https://salesforce-agentforce-chat.vercel.app" target="_blank" rel="noreferrer" class="inline-flex items-center justify-center w-full px-4 py-2.5 bg-slate-800 hover:bg-purple-600 text-sm font-medium rounded-lg text-slate-200 hover:text-white transition-colors border border-slate-700 hover:border-purple-500">
-                    Launch Application <i class="fa-solid fa-arrow-up-right-from-square ml-2 text-xs"></i>
-                </a>
-            </div>
+    <main class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+      <article class="group rounded-[1.75rem] border border-indigo-100 bg-white/88 shadow-lg shadow-slate-200/70 p-7 transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-indigo-200/70">
+        <div class="flex items-center justify-between mb-5">
+          <div class="h-14 w-14 rounded-2xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 text-2xl">
+            <i class="fa-solid fa-database"></i>
+          </div>
+          <span class="text-sm font-bold uppercase tracking-[0.18em] text-indigo-700">App 01</span>
+        </div>
+        <h2 class="text-2xl sm:text-3xl font-black text-slate-950">Unified Profile Dashboard</h2>
+        <p class="mt-4 text-lg leading-8 text-slate-700">
+          A premium customer-profile interface with live Salesforce Account records routed through the Railway backend proxy.
+        </p>
+        <a href="https://salesforce-agentforce-profile.vercel.app/" target="_blank" rel="noreferrer" class="mt-7 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-indigo-600 px-5 py-4 text-lg font-bold text-white transition hover:bg-indigo-700">
+          Launch App 1 <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+        </a>
+      </article>
 
-            <!-- App 3 -->
-            <div class="group border border-slate-800 hover:border-emerald-500/50 bg-slate-900/40 backdrop-blur-sm rounded-xl p-6 transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between">
-                <div>
-                    <div class="w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl mb-5 group-hover:scale-110 transition-transform">
-                        <i class="fa-solid fa-circle-nodes"></i>
-                    </div>
-                    <span class="text-xs font-medium text-emerald-400 tracking-wider uppercase">App 03 · Intermediate-Advanced</span>
-                    <h3 class="text-xl font-bold mt-2 mb-3 text-slate-100 group-hover:text-emerald-400 transition-colors">Commerce Analytics Console</h3>
-                    <p class="text-sm text-slate-400 leading-relaxed mb-6">
-                        Executes structured Salesforce GraphQL transactions to request nested, complex parent-child pipeline analytics efficiently.
-                    </p>
-                </div>
-                <a href="https://salesforce-agentforce-analytics.vercel.app" target="_blank" rel="noreferrer" class="inline-flex items-center justify-center w-full px-4 py-2.5 bg-slate-800 hover:bg-emerald-600 text-sm font-medium rounded-lg text-slate-200 hover:text-white transition-colors border border-slate-700 hover:border-emerald-500">
-                    Launch Application <i class="fa-solid fa-arrow-up-right-from-square ml-2 text-xs"></i>
-                </a>
-            </div>
+      <article class="group rounded-[1.75rem] border border-purple-100 bg-white/88 shadow-lg shadow-slate-200/70 p-7 transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-purple-200/70">
+        <div class="flex items-center justify-between mb-5">
+          <div class="h-14 w-14 rounded-2xl bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 text-2xl">
+            <i class="fa-solid fa-robot"></i>
+          </div>
+          <span class="text-sm font-bold uppercase tracking-[0.18em] text-purple-700">App 02</span>
+        </div>
+        <h2 class="text-2xl sm:text-3xl font-black text-slate-950">Agentforce Guardrail Chat</h2>
+        <p class="mt-4 text-lg leading-8 text-slate-700">
+          An enterprise AI chat simulation showing agent status, response states, guardrails, and grounding-source transparency.
+        </p>
+        <a href="https://salesforce-agentforce-chat.vercel.app/" target="_blank" rel="noreferrer" class="mt-7 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-purple-600 px-5 py-4 text-lg font-bold text-white transition hover:bg-purple-700">
+          Launch App 2 <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+        </a>
+      </article>
 
-        </main>
+      <article class="group rounded-[1.75rem] border border-emerald-100 bg-white/88 shadow-lg shadow-slate-200/70 p-7 transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-200/70">
+        <div class="flex items-center justify-between mb-5">
+          <div class="h-14 w-14 rounded-2xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-700 text-2xl">
+            <i class="fa-solid fa-circle-nodes"></i>
+          </div>
+          <span class="text-sm font-bold uppercase tracking-[0.18em] text-emerald-700">App 03</span>
+        </div>
+        <h2 class="text-2xl sm:text-3xl font-black text-slate-950">Commerce Analytics Console</h2>
+        <p class="mt-4 text-lg leading-8 text-slate-700">
+          A GraphQL-inspired command center with corrected code rendering and a live Salesforce GraphQL proxy test panel.
+        </p>
+        <a href="https://salesforce-agentforce-analytics.vercel.app/" target="_blank" rel="noreferrer" class="mt-7 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-emerald-600 px-5 py-4 text-lg font-bold text-white transition hover:bg-emerald-700">
+          Launch App 3 <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+        </a>
+      </article>
+    </main>
 
-        <!-- Architecture Callout -->
-        <footer class="border-t border-slate-900 pt-8 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-4">
-            <div>
-                Built via React, Vite, Tailwind CSS, & Node.js Proxy
-            </div>
-            <div class="flex space-x-6">
-                <span><i class="fa-brands fa-aws text-orange-400 mr-1.5"></i> Shared Responsibility Model Enforced</span>
-                <span><i class="fa-solid fa-server text-cyan-400 mr-1.5"></i> Hosted on Railway PaaS</span>
-            </div>
-        </footer>
+    <section class="rounded-[1.75rem] border border-slate-200 bg-white/80 shadow-lg shadow-slate-200/70 p-7 sm:p-8">
+      <h2 class="text-2xl sm:text-3xl font-black text-slate-950">What this demonstrates</h2>
+      <div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4 text-lg leading-8 text-slate-700">
+        <p><strong class="text-slate-950">Frontend:</strong> React/TanStack UI exports deployed independently from a single GitHub monorepo.</p>
+        <p><strong class="text-slate-950">Backend:</strong> Railway Express proxy keeps OAuth credentials and Salesforce secrets out of browser code.</p>
+        <p><strong class="text-slate-950">Cloud pattern:</strong> Secure decoupling, environment variables, API routing, and deployment separation.</p>
+      </div>
+    </section>
 
-    </div>
+    <footer class="mt-8 flex flex-col sm:flex-row justify-between gap-4 text-base text-slate-600">
+      <div>Built with React, Tailwind CSS, Vercel, Railway, Node.js, and Salesforce Developer Edition.</div>
+      <div class="flex flex-wrap gap-5">
+        <span><i class="fa-brands fa-github mr-2"></i>Monorepo workflow</span>
+        <span><i class="fa-brands fa-aws text-orange-500 mr-2"></i>Cloud practitioner architecture mapping</span>
+      </div>
+    </footer>
+  </div>
 </body>
 </html>
