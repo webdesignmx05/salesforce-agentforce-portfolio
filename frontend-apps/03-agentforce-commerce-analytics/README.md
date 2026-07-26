@@ -51,13 +51,16 @@ The live test works when:
 
 The lower pipeline intelligence grid remains simulated until real Salesforce opportunity or commerce objects are intentionally mapped into the dashboard UI.
 
-## Opportunity drilldown drawer
+## Drilldown overlays and sortable grids
 
-The simulated Account Intelligence Grid now treats each `OPP-####` value as an interactive drilldown control. Clicking an opportunity ID opens a right-side detail drawer with:
+The simulated Account Intelligence Grid now treats each `OPP-####` value as an interactive drilldown control. Clicking an opportunity ID opens a centered, responsive full-screen overlay with:
 
 - opportunity amount, stage, probability, and owner
 - parent account and industry context
 - next-action intelligence based on stage/probability
-- a clear note that the drawer is simulated until real Opportunity records are mapped
+- a sortable detail matrix that can be sorted by field, value, or source
+- a clear note that the opportunity overlay is simulated until real Opportunity records are mapped
 
-This keeps the live Salesforce GraphQL Account demo separate from the simulated opportunity grid while making the dashboard feel more realistic for a portfolio walkthrough.
+The live Salesforce Account table also treats the returned Salesforce ID as an interactive drilldown control. Clicking a live Salesforce ID opens the same centered overlay pattern, but the account fields are labeled as live Salesforce GraphQL response data from the Railway proxy.
+
+Both the main Account Intelligence Grid and the live Account query table have sortable column headers. This improves the demo without adding another backend dependency.

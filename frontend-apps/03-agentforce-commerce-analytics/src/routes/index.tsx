@@ -246,6 +246,54 @@ type LiveGraphQLState = {
   lastUpdated: string | null;
 };
 
+type DetailOverlay =
+  | { kind: "opportunity"; record: OppRecord }
+  | { kind: "account"; record: LiveGraphQLAccount }
+  | null;
+
+type SortDirection = "asc" | "desc";
+type SortState<Key extends string> = { key: Key; direction: SortDirection };
+type OpportunitySortKey = "id" | "name" | "parent" | "industry" | "amount" | "stage" | "probability" | "owner";
+type AccountSortKey = "id" | "name" | "industry" | "type" | "website" | "owner";
+type DetailSortKey = "label" | "value" | "source";
+
+type DetailRow = {
+  label: string;
+  value: string;
+  source: string;
+};
+
+const defaultOpportunitySort: SortState<OpportunitySortKey> = { key: "amount", direction: "desc" };
+const defaultAccountSort: SortState<AccountSortKey> = { key: "name", direction: "asc" };
+const defaultDetailSort: SortState<DetailSortKey> = { key: "label", direction: "asc" };
+
+function nextSortState<Key extends string>(current: SortState<Key>, key: Key): SortState<Key> {
+  if (current.key === key) {
+    return { key, direction: current.direction === "asc" ? "desc" : "asc" };
+  }
+  return { key, direction: "asc" };
+}
+
+function compareSortValues(a: string | number, b: string | number, direction: SortDirection) {
+  const multiplier = direction === "asc" ? 1 : -1;
+  if (typeof a === "number" && typeof b === "number") {
+    return (a - b) * multiplier;
+  }
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" }) * multiplier;
+}
+
+function sortOpportunities(items: OppRecord[], sort: SortState<OpportunitySortKey>) {
+  return [...items].sort((a, b) => compareSortValues(a[sort.key], b[sort.key], sort.direction));
+}
+
+function sortAccounts(items: LiveGraphQLAccount[], sort: SortState<AccountSortKey>) {
+  return [...items].sort((a, b) => compareSortValues(a[sort.key], b[sort.key], sort.direction));
+}
+
+function sortDetailRows(items: DetailRow[], sort: SortState<DetailSortKey>) {
+  return [...items].sort((a, b) => compareSortValues(a[sort.key], b[sort.key], sort.direction));
+}
+
 const BACKEND_PROXY_URL = import.meta.env.VITE_BACKEND_PROXY_URL as
   | string
   | undefined;
@@ -315,7 +363,10 @@ async function fetchLiveGraphQLAccounts(
 
 function Dashboard() {
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [selectedOpportunity, setSelectedOpportunity] = useState<OppRecord | null>(null);
+  const [activeOverlay, setActiveOverlay] = useState<DetailOverlay>(null);
+  const [opportunitySort, setOpportunitySort] = useState<SortState<OpportunitySortKey>>(defaultOpportunitySort);
+  const [accountSort, setAccountSort] = useState<SortState<AccountSortKey>>(defaultAccountSort);
+  const [overlaySort, setOverlaySort] = useState<SortState<DetailSortKey>>(defaultDetailSort);
   const [activeNavTab, setActiveNavTab] = useState<NavKey>("pipeline");
   const [graphQLControls, setGraphQLControls] = useState<GraphQLAccountControls>(defaultGraphQLControls);
   const [latency, setLatency] = useState(42);
@@ -339,9 +390,14 @@ function Dashboard() {
     return () => clearInterval(id);
   }, []);
 
-  const visible = useMemo(
-    () => (filter === "all" ? records : records.filter((r) => r.category === filter)),
-    [filter],
+  const visible = useMemo(() => {
+    const filtered = filter === "all" ? records : records.filter((r) => r.category === filter);
+    return sortOpportunities(filtered, opportunitySort);
+  }, [filter, opportunitySort]);
+
+  const sortedLiveAccounts = useMemo(
+    () => sortAccounts(liveGraphQL.records, accountSort),
+    [liveGraphQL.records, accountSort],
   );
 
   const activeGraphQLQuery = useMemo(
@@ -486,8 +542,11 @@ function Dashboard() {
 
         {/* LIVE GRAPHQL PROXY TEST */}
         <LiveGraphQLProxyPanel
-          state={liveGraphQL}
+          state={{ ...liveGraphQL, records: sortedLiveAccounts }}
           controls={graphQLControls}
+          accountSort={accountSort}
+          onAccountSort={(key) => setAccountSort((current) => nextSortState(current, key))}
+          onOpenAccount={(record) => setActiveOverlay({ kind: "account", record })}
           onControlsChange={handleGraphQLControlsChange}
           onRun={loadLiveGraphQLAccounts}
         />
@@ -560,14 +619,14 @@ function Dashboard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground border-b border-border">
-                  <th className="py-3 px-3">ID</th>
-                  <th className="py-3 px-3">Opportunity</th>
-                  <th className="py-3 px-3">Parent Account</th>
-                  <th className="py-3 px-3">Industry</th>
-                  <th className="py-3 px-3 text-right">Amount</th>
-                  <th className="py-3 px-3">Stage</th>
-                  <th className="py-3 px-3">Prob.</th>
-                  <th className="py-3 px-3">Owner</th>
+                  <SortableTh label="ID" sortKey="id" sort={opportunitySort} onSort={(key) => setOpportunitySort((current) => nextSortState(current, key))} />
+                  <SortableTh label="Opportunity" sortKey="name" sort={opportunitySort} onSort={(key) => setOpportunitySort((current) => nextSortState(current, key))} />
+                  <SortableTh label="Parent Account" sortKey="parent" sort={opportunitySort} onSort={(key) => setOpportunitySort((current) => nextSortState(current, key))} />
+                  <SortableTh label="Industry" sortKey="industry" sort={opportunitySort} onSort={(key) => setOpportunitySort((current) => nextSortState(current, key))} />
+                  <SortableTh label="Amount" sortKey="amount" sort={opportunitySort} onSort={(key) => setOpportunitySort((current) => nextSortState(current, key))} align="right" />
+                  <SortableTh label="Stage" sortKey="stage" sort={opportunitySort} onSort={(key) => setOpportunitySort((current) => nextSortState(current, key))} />
+                  <SortableTh label="Prob." sortKey="probability" sort={opportunitySort} onSort={(key) => setOpportunitySort((current) => nextSortState(current, key))} />
+                  <SortableTh label="Owner" sortKey="owner" sort={opportunitySort} onSort={(key) => setOpportunitySort((current) => nextSortState(current, key))} />
                 </tr>
               </thead>
               <tbody>
@@ -580,9 +639,9 @@ function Dashboard() {
                     <td className="py-3 px-3 font-mono text-xs">
                       <button
                         type="button"
-                        onClick={() => setSelectedOpportunity(r)}
+                        onClick={() => setActiveOverlay({ kind: "opportunity", record: r })}
                         className="text-[var(--electric-blue)] underline decoration-[var(--electric-blue)]/40 underline-offset-4 transition hover:text-[var(--cyber-green)] hover:decoration-[var(--cyber-green)] focus:outline-none focus:ring-2 focus:ring-[var(--electric-blue)] focus:ring-offset-2 focus:ring-offset-background rounded-sm"
-                        aria-label={`Open detail drawer for ${r.id} ${r.name}`}
+                        aria-label={`Open full-screen detail overlay for ${r.id} ${r.name}`}
                       >
                         {r.id}
                       </button>
@@ -620,10 +679,15 @@ function Dashboard() {
           </div>
         </section>
 
-        <OpportunityDetailDrawer record={selectedOpportunity} onClose={() => setSelectedOpportunity(null)} />
+        <RecordDetailOverlay
+          overlay={activeOverlay}
+          sort={overlaySort}
+          onSort={(key) => setOverlaySort((current) => nextSortState(current, key))}
+          onClose={() => setActiveOverlay(null)}
+        />
 
         <footer className="text-[10px] font-mono uppercase tracking-[0.3em] text-muted-foreground py-4 text-center">
-          Nexus BI · GraphQL UI fixed · Live proxy test uses{" "}
+          Nexus BI · GraphQL UI fixed · sortable tables · live proxy test uses{" "}
           <span className="text-[var(--electric-blue)]">/api/salesforce/graphql/account-query</span>
         </footer>
       </main>
@@ -633,94 +697,201 @@ function Dashboard() {
 
 /* ---------- Components ---------- */
 
-function OpportunityDetailDrawer({
-  record,
+function RecordDetailOverlay({
+  overlay,
+  sort,
+  onSort,
   onClose,
 }: {
-  record: OppRecord | null;
+  overlay: DetailOverlay;
+  sort: SortState<DetailSortKey>;
+  onSort: (key: DetailSortKey) => void;
   onClose: () => void;
 }) {
-  if (!record) return null;
+  useEffect(() => {
+    if (!overlay) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [overlay, onClose]);
 
-  const detail = getOpportunityDetail(record);
-  const amount = `$${(record.amount / 1_000_000).toFixed(2)}M`;
+  if (!overlay) return null;
+
+  const isOpportunity = overlay.kind === "opportunity";
+  const title = isOpportunity ? overlay.record.name : overlay.record.name;
+  const subtitle = isOpportunity ? overlay.record.id : overlay.record.id;
+  const eyebrow = isOpportunity ? "Opportunity Drilldown" : "Live Salesforce Account Drilldown";
+  const sourceNote = isOpportunity
+    ? "This centered overlay is powered by the simulated portfolio pipeline grid. A later version could map these rows to live Opportunity records."
+    : "This centered overlay uses the live Salesforce GraphQL Account response returned through the Railway proxy.";
+
+  const rows = isOpportunity
+    ? buildOpportunityDetailRows(overlay.record)
+    : buildAccountDetailRows(overlay.record);
+  const sortedRows = sortDetailRows(rows, sort);
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/55 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`Opportunity detail for ${record.id}`}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md md:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${eyebrow} for ${subtitle}`}
+    >
       <button
         type="button"
-        aria-label="Close opportunity detail drawer"
+        aria-label="Close record detail overlay"
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
-      <aside className="relative z-10 h-full w-full max-w-xl overflow-y-auto border-l border-[var(--electric-blue)]/30 bg-background/95 p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
+      <section className="relative z-10 w-full max-w-6xl overflow-hidden rounded-2xl border border-[var(--electric-blue)]/30 bg-background/95 shadow-2xl glow-blue">
+        <div className="flex flex-col gap-4 border-b border-border bg-[var(--surface-2)]/60 px-5 py-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="text-xs font-mono uppercase tracking-[0.3em] text-[var(--cyber-green)]">
-              Opportunity Drilldown
+              {eyebrow}
             </div>
-            <h3 className="mt-2 text-2xl font-semibold text-gradient-cyber">{record.name}</h3>
-            <p className="mt-1 font-mono text-xs text-[var(--electric-blue)]">{record.id}</p>
+            <h3 className="mt-2 text-2xl font-semibold text-gradient-cyber md:text-3xl">{title}</h3>
+            <p className="mt-1 font-mono text-xs text-[var(--electric-blue)]">{subtitle}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-border px-3 py-2 text-xs font-mono uppercase tracking-wider text-muted-foreground transition hover:border-[var(--electric-blue)] hover:text-foreground"
+            className="self-start rounded-md border border-border px-3 py-2 text-xs font-mono uppercase tracking-wider text-muted-foreground transition hover:border-[var(--electric-blue)] hover:text-foreground"
           >
             Close
           </button>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <DetailMetric label="Amount" value={amount} />
-          <DetailMetric label="Probability" value={`${record.probability}%`} />
-          <DetailMetric label="Stage" value={record.stage} />
-          <DetailMetric label="Owner" value={record.owner} />
+        <div className="max-h-[78vh] overflow-y-auto p-5 space-y-5">
+          {isOpportunity ? (
+            <OpportunityOverlaySummary record={overlay.record} />
+          ) : (
+            <AccountOverlaySummary record={overlay.record} />
+          )}
+
+          <div className="panel p-4">
+            <div className="flex flex-col gap-2 border-b border-border pb-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
+                  Sortable Detail Matrix
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Click the column headings to sort the overlay fields without leaving the command center.
+                </p>
+              </div>
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--electric-blue)]">
+                Center overlay · responsive
+              </span>
+            </div>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground border-b border-border">
+                    <SortableTh label="Field" sortKey="label" sort={sort} onSort={onSort} />
+                    <SortableTh label="Value" sortKey="value" sort={sort} onSort={onSort} />
+                    <SortableTh label="Source" sortKey="source" sort={sort} onSort={onSort} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedRows.map((row) => (
+                    <tr key={`${row.label}-${row.source}`} className="border-b border-border/40 hover:bg-[var(--surface-2)]/60">
+                      <td className="py-3 px-3 font-mono text-xs text-[var(--electric-blue)]">{row.label}</td>
+                      <td className="py-3 px-3 font-medium">{row.value}</td>
+                      <td className="py-3 px-3 text-muted-foreground">{row.source}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="panel p-4">
+            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
+              Demonstration Boundary
+            </div>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">{sourceNote}</p>
+          </div>
         </div>
-
-        <div className="mt-5 space-y-4">
-          <div className="panel p-4">
-            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
-              Account Context
-            </div>
-            <dl className="mt-3 grid grid-cols-1 gap-3 text-sm">
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Parent account</dt>
-                <dd className="font-medium text-right">{record.parent}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Industry</dt>
-                <dd className="font-medium text-right">{record.industry}</dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-muted-foreground">Signal category</dt>
-                <dd className="font-mono text-xs uppercase text-[var(--neon-pink)] text-right">{record.category.replace("-", " ")}</dd>
-              </div>
-            </dl>
-          </div>
-
-          <div className="panel p-4">
-            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
-              Action Intelligence
-            </div>
-            <p className="mt-3 text-sm leading-6 text-foreground">{detail.urgency}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{detail.nextAction}</p>
-          </div>
-
-          <div className="panel p-4">
-            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
-              GraphQL Demonstration Note
-            </div>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              This drawer is a simulated opportunity drilldown for the portfolio grid. A later live version could request
-              <span className="mx-1 font-mono text-[var(--electric-blue)]">{detail.graphQLShape}</span>
-              through the same Railway-controlled GraphQL proxy pattern.
-            </p>
-          </div>
-        </div>
-      </aside>
+      </section>
     </div>
   );
+}
+
+function OpportunityOverlaySummary({ record }: { record: OppRecord }) {
+  const detail = getOpportunityDetail(record);
+  const amount = `$${(record.amount / 1_000_000).toFixed(2)}M`;
+
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="lg:col-span-2 panel p-4">
+        <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
+          Action Intelligence
+        </div>
+        <p className="mt-3 text-lg font-semibold text-foreground">{detail.urgency}</p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">{detail.nextAction}</p>
+        <p className="mt-3 text-xs leading-5 text-muted-foreground">
+          GraphQL concept: <span className="text-[var(--electric-blue)]">{detail.graphQLShape}</span>
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <DetailMetric label="Amount" value={amount} />
+        <DetailMetric label="Probability" value={`${record.probability}%`} />
+        <DetailMetric label="Stage" value={record.stage} />
+        <DetailMetric label="Owner" value={record.owner} />
+      </div>
+    </div>
+  );
+}
+
+function AccountOverlaySummary({ record }: { record: LiveGraphQLAccount }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="lg:col-span-2 panel p-4">
+        <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground">
+          Live Account Context
+        </div>
+        <p className="mt-3 text-lg font-semibold text-foreground">{record.name}</p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          This account was returned from Salesforce GraphQL UI API through the Railway backend proxy. The browser sees the response data, but not the Salesforce OAuth token or Connected App secret.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <DetailMetric label="Industry" value={record.industry} />
+        <DetailMetric label="Type" value={record.type} />
+        <DetailMetric label="Owner" value={record.owner} />
+        <DetailMetric label="Source" value="Live GraphQL" />
+      </div>
+    </div>
+  );
+}
+
+function buildOpportunityDetailRows(record: OppRecord): DetailRow[] {
+  const detail = getOpportunityDetail(record);
+  return [
+    { label: "Opportunity ID", value: record.id, source: "Simulated grid" },
+    { label: "Opportunity", value: record.name, source: "Simulated grid" },
+    { label: "Parent Account", value: record.parent, source: "Simulated relationship" },
+    { label: "Industry", value: record.industry, source: "Simulated account field" },
+    { label: "Amount", value: `$${record.amount.toLocaleString()}`, source: "Simulated opportunity field" },
+    { label: "Stage", value: record.stage, source: "Simulated opportunity field" },
+    { label: "Probability", value: `${record.probability}%`, source: "Simulated opportunity field" },
+    { label: "Owner", value: record.owner, source: "Simulated owner field" },
+    { label: "Category", value: record.category.replace("-", " "), source: "UI filter segment" },
+    { label: "Next Action", value: detail.nextAction, source: "Derived demo logic" },
+  ];
+}
+
+function buildAccountDetailRows(record: LiveGraphQLAccount): DetailRow[] {
+  return [
+    { label: "Salesforce ID", value: record.id, source: "Live GraphQL response" },
+    { label: "Account Name", value: record.name, source: "Live GraphQL response" },
+    { label: "Industry", value: record.industry, source: "Live GraphQL response" },
+    { label: "Type", value: record.type, source: "Live GraphQL response" },
+    { label: "Website", value: record.website, source: "Live GraphQL response" },
+    { label: "Owner", value: record.owner, source: "Expanded GraphQL field" },
+    { label: "Credential Boundary", value: "Railway only", source: "Architecture" },
+  ];
 }
 
 function DetailMetric({ label, value }: { label: string; value: string }) {
@@ -729,6 +900,36 @@ function DetailMetric({ label, value }: { label: string; value: string }) {
       <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
       <div className="mt-2 text-lg font-semibold">{value}</div>
     </div>
+  );
+}
+
+function SortableTh<Key extends string>({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  sortKey: Key;
+  sort: SortState<Key>;
+  onSort: (key: Key) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.key === sortKey;
+  const arrow = active ? (sort.direction === "asc" ? "↑" : "↓") : "↕";
+  return (
+    <th className={`py-3 px-3 ${align === "right" ? "text-right" : "text-left"}`} aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1.5 rounded-sm transition hover:text-[var(--electric-blue)] focus:outline-none focus:ring-2 focus:ring-[var(--electric-blue)] focus:ring-offset-2 focus:ring-offset-background ${align === "right" ? "justify-end" : "justify-start"}`}
+        title={`Sort by ${label}`}
+      >
+        <span>{label}</span>
+        <span className={active ? "text-[var(--cyber-green)]" : "text-muted-foreground/60"}>{arrow}</span>
+      </button>
+    </th>
   );
 }
 
@@ -783,11 +984,17 @@ function QueryIDE({ query }: { query: string }) {
 function LiveGraphQLProxyPanel({
   state,
   controls,
+  accountSort,
+  onAccountSort,
+  onOpenAccount,
   onControlsChange,
   onRun,
 }: {
   state: LiveGraphQLState;
   controls: GraphQLAccountControls;
+  accountSort: SortState<AccountSortKey>;
+  onAccountSort: (key: AccountSortKey) => void;
+  onOpenAccount: (record: LiveGraphQLAccount) => void;
   onControlsChange: (controls: GraphQLAccountControls) => void;
   onRun: () => void;
 }) {
@@ -918,19 +1125,28 @@ function LiveGraphQLProxyPanel({
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground border-b border-border">
-              <th className="py-3 px-3">Salesforce ID</th>
-              <th className="py-3 px-3">Account Name</th>
-              <th className="py-3 px-3">Industry</th>
-              <th className="py-3 px-3">Type</th>
-              <th className="py-3 px-3">Website</th>
-              {controls.fieldMode === "expanded" && <th className="py-3 px-3">Owner</th>}
+              <SortableTh label="Salesforce ID" sortKey="id" sort={accountSort} onSort={onAccountSort} />
+              <SortableTh label="Account Name" sortKey="name" sort={accountSort} onSort={onAccountSort} />
+              <SortableTh label="Industry" sortKey="industry" sort={accountSort} onSort={onAccountSort} />
+              <SortableTh label="Type" sortKey="type" sort={accountSort} onSort={onAccountSort} />
+              <SortableTh label="Website" sortKey="website" sort={accountSort} onSort={onAccountSort} />
+              {controls.fieldMode === "expanded" && <SortableTh label="Owner" sortKey="owner" sort={accountSort} onSort={onAccountSort} />}
             </tr>
           </thead>
           <tbody>
             {state.records.length > 0 ? (
               state.records.map((record) => (
                 <tr key={record.id} className="border-b border-border/40 hover:bg-[var(--surface-2)]/60">
-                  <td className="py-3 px-3 font-mono text-xs text-[var(--electric-blue)]">{record.id}</td>
+                  <td className="py-3 px-3 font-mono text-xs">
+                    <button
+                      type="button"
+                      onClick={() => onOpenAccount(record)}
+                      className="text-[var(--electric-blue)] underline decoration-[var(--electric-blue)]/40 underline-offset-4 transition hover:text-[var(--cyber-green)] hover:decoration-[var(--cyber-green)] focus:outline-none focus:ring-2 focus:ring-[var(--electric-blue)] focus:ring-offset-2 focus:ring-offset-background rounded-sm"
+                      aria-label={`Open full-screen Salesforce account overlay for ${record.id} ${record.name}`}
+                    >
+                      {record.id}
+                    </button>
+                  </td>
                   <td className="py-3 px-3 font-medium">{record.name}</td>
                   <td className="py-3 px-3 text-muted-foreground">{record.industry}</td>
                   <td className="py-3 px-3 text-muted-foreground">{record.type}</td>
